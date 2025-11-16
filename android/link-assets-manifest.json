@@ -1,0 +1,13 @@
+{
+  "migIndex": 1,
+  "data": [
+    {
+      "path": "src/assets/fonts/ZalandoSansExpanded-Italic-VariableFont_wght.ttf",
+      "sha1": "47721fbd6f71254fa3df15f39f371b9337c67a63"
+    },
+    {
+      "path": "src/assets/fonts/ZalandoSansExpanded-VariableFont_wght.ttf",
+      "sha1": "1e3c135f26a8a855769592fac0de77bd07c21cdf"
+    }
+  ]
+}
