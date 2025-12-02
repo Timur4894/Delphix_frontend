@@ -1,15 +1,24 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import React, { useState, useContext } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AuthStackParamList } from "../../navigation/stackNavigation/AuthNavigation";
 import theme from "../../constants/colors";
 import GradientBtn from "../../components/GradientBtn";
+import { fontSizes } from "../../utils/fontSizes";
+import { signupApi } from "../../api/authApi";
+import { AuthContext } from "../../context/AuthContext";
+import ProfileSvg from "../../assets/svg/ProfileSvg";
+import MailSvg from "../../assets/svg/MailSvg";
+import LockSvg from "../../assets/svg/LockSvg";
+import EyeClosedSvg from "../../assets/svg/EyeClosedSvg";
+import EyeOpenSvg from "../../assets/svg/EyeOpenSvg";
 
 type RegistrationScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Registration'>;
 
 const RegistrationScreen = () => {
     const navigation = useNavigation<RegistrationScreenNavigationProp>();
+    const { login } = useContext(AuthContext);
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -17,25 +26,57 @@ const RegistrationScreen = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [agreeToTerms, setAgreeToTerms] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    const handleSignup = async () => {
+        if (!name || !email || !password || !confirmPassword) {
+            Alert.alert("Error", "Please fill in all fields");
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            Alert.alert("Error", "Passwords do not match");
+            return;
+        }
+
+        if (!agreeToTerms) {
+            Alert.alert("Error", "Please agree to the Terms & Conditions");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const response = await signupApi(email, password, name);
+            if (response.access_token) {
+                // Сохраняем токен и профиль пользователя в контекст
+                // response может содержать user или мы используем данные из response
+                const userData = response.user || { email, user_name: name, id: response.id };
+                await login(userData, response.access_token);
+                // Navigation will be handled by AppContent based on token
+            }
+        } catch (error: any) {
+            Alert.alert(
+                "Registration Failed", 
+                error.response?.data?.message || error.message || "An error occurred during registration"
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
-        <View style={styles.container} >
-           
-
-            {/* Logo and Title */}
+        <ScrollView style={styles.container} > 
             <View style={styles.logoContainer}>
                 <Text style={styles.logoText}>
                     <Text style={styles.logoTextAccent}>Delphix</Text>
                 </Text>
             </View>
 
-            {/* Main Title */}
             <Text style={styles.mainTitle}>Create your account</Text>
             <Text style={styles.subtitle}>Sign up to start investing and get AI-powered forecasts</Text>
 
-            {/* Name Input */}
             <View style={styles.inputContainer}>
-                <Text style={styles.inputIcon}>👤</Text>
+                <ProfileSvg width={24} height={24} color={theme.accent.magenta} style={{marginRight: 12}}/>
                 <TextInput
                     style={styles.input}
                     placeholder="Enter Your Name"
@@ -46,9 +87,8 @@ const RegistrationScreen = () => {
                 />
             </View>
 
-            {/* Email Input */}
             <View style={styles.inputContainer}>
-                <Text style={styles.inputIcon}>✉️</Text>
+                <MailSvg width={24} height={24} color={theme.accent.magenta} style={{marginRight: 12}}/>
                 <TextInput
                     style={styles.input}
                     placeholder="Enter Your Email"
@@ -62,7 +102,7 @@ const RegistrationScreen = () => {
 
             {/* Password Input */}
             <View style={styles.inputContainer}>
-                <Text style={styles.inputIcon}>🔒</Text>
+                <LockSvg width={24} height={24} color={theme.accent.magenta} style={{marginRight: 12}}/>
                 <TextInput
                     style={styles.input}
                     placeholder="Enter Your Password"
@@ -72,13 +112,12 @@ const RegistrationScreen = () => {
                     secureTextEntry={!showPassword}
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                    <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                    {showPassword ? <EyeClosedSvg width={24} height={24} color={theme.accent.magenta} style={{marginRight: 12}}/> : <EyeOpenSvg width={24} height={24} color={theme.accent.magenta} style={{marginRight: 12}}/>}
                 </TouchableOpacity>
             </View>
 
-            {/* Confirm Password Input */}
             <View style={styles.inputContainer}>
-                <Text style={styles.inputIcon}>🔒</Text>
+                <LockSvg width={24} height={24} color={theme.accent.magenta} style={{marginRight: 12}}/>
                 <TextInput
                     style={styles.input}
                     placeholder="Confirm Your Password"
@@ -88,11 +127,10 @@ const RegistrationScreen = () => {
                     secureTextEntry={!showConfirmPassword}
                 />
                 <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-                    <Text style={styles.eyeIcon}>{showConfirmPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                    {showConfirmPassword ? <EyeClosedSvg width={24} height={24} color={theme.accent.magenta} style={{marginRight: 12}}/> : <EyeOpenSvg width={24} height={24} color={theme.accent.magenta} style={{marginRight: 12}}/>}
                 </TouchableOpacity>
             </View>
 
-            {/* Terms and Conditions */}
             <View style={styles.termsContainer}>
                 <TouchableOpacity 
                     style={styles.checkboxContainer}
@@ -101,39 +139,38 @@ const RegistrationScreen = () => {
                     <View style={[styles.checkbox, agreeToTerms && styles.checkboxChecked]}>
                         {agreeToTerms && <Text style={styles.checkmark}>✓</Text>}
                     </View>
-                    <Text style={styles.termsText}>
-                        I agree to the <Text style={styles.termsLink}>Terms & Conditions</Text> and <Text style={styles.termsLink}>Privacy Policy</Text>
-                    </Text>
+                    <View style={styles.termsTextContainer}>
+                        <Text style={styles.termsText}>
+                            I agree to the{' '}
+                        </Text>
+                        <TouchableOpacity onPress={() => navigation.navigate('TermsConditions')}>
+                            <Text style={styles.termsLink}>Terms & Conditions</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.termsText}>
+                            {' '}and{' '}
+                        </Text>
+                        <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')}>
+                            <Text style={styles.termsLink}>Privacy Policy</Text>
+                        </TouchableOpacity>
+                    </View>
                 </TouchableOpacity>
             </View>
 
             {/* Sign Up Button */}
             <GradientBtn 
-                text="Sign Up" 
-                onPress={() => {
-                    // TODO: Implement registration logic
-                    console.log('Registration:', { name, email, password, confirmPassword, agreeToTerms });
-                }} 
+                text={loading ? "Signing up..." : "Sign Up"} 
+                onPress={loading ? () => {} : handleSignup}
             />
+            {loading && (
+                <ActivityIndicator 
+                    size="small" 
+                    color={theme.accent.magenta} 
+                    style={{ marginTop: 10 }} 
+                />
+            )}
 
-            {/* Divider */}
-            <View style={styles.dividerContainer}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>Or Continue With</Text>
-                <View style={styles.dividerLine} />
-            </View>
-
-            {/* Social Login Buttons */}
-            <View style={styles.socialContainer}>
-                <TouchableOpacity style={styles.socialButton}>
-                    <Text style={styles.socialIcon}>G</Text>
-                    <Text style={styles.socialText}>Google</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.socialButton}>
-                    <Text style={styles.socialIcon}>🍎</Text>
-                    <Text style={styles.socialText}>Apple</Text>
-                </TouchableOpacity>
-            </View>
+         
+            
 
             {/* Sign In Link */}
             <View style={styles.signInContainer}>
@@ -142,16 +179,17 @@ const RegistrationScreen = () => {
                     <Text style={styles.signInLink}>Sign in</Text>
                 </TouchableOpacity>
             </View>
-        </View>
+        </ScrollView>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        paddingTop: 70,
         backgroundColor: theme.background.primary,
         paddingHorizontal: 20,
-        justifyContent: 'center',
+        // justifyContent: 'center',
     },
 
     backButton: {
@@ -159,7 +197,7 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     backIcon: {
-        fontSize: 24,
+        fontSize: fontSizes.h3,
         color: theme.accent.magenta,
         fontFamily: 'ZalandoSansExpanded-Italic',
     },
@@ -168,11 +206,11 @@ const styles = StyleSheet.create({
         marginBottom: 30,
     },
     logo: {
-        fontSize: 60,
+        fontSize: fontSizes.xlarge,
         marginBottom: 10,
     },
     logoText: {
-        fontSize: 32,
+        fontSize: fontSizes.h2,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.primary,
     },
@@ -181,14 +219,14 @@ const styles = StyleSheet.create({
         fontWeight: '900',
     },
     mainTitle: {
-        fontSize: 28,
+        fontSize: fontSizes.h2,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.primary,
         marginBottom: 8,
         textAlign: 'center',
     },
     subtitle: {
-        fontSize: 14,
+        fontSize: fontSizes.bodySmall,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.secondary,
         marginBottom: 30,
@@ -205,18 +243,18 @@ const styles = StyleSheet.create({
         borderColor: theme.border.default,
     },
     inputIcon: {
-        fontSize: 20,
+        fontSize: fontSizes.h4,
         marginRight: 10,
     },
     input: {
         flex: 1,
-        fontSize: 16,
+        fontSize: fontSizes.body,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.primary,
         paddingVertical: 15,
     },
     eyeIcon: {
-        fontSize: 20,
+        fontSize: fontSizes.h4,
         marginLeft: 10,
     },
     termsContainer: {
@@ -242,18 +280,26 @@ const styles = StyleSheet.create({
     },
     checkmark: {
         color: theme.text.primary,
-        fontSize: 12,
+        fontSize: fontSizes.caption,
         fontWeight: 'bold',
     },
-    termsText: {
+    termsTextContainer: {
         flex: 1,
-        fontSize: 14,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+    },
+    termsText: {
+        fontSize: fontSizes.bodySmall,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.secondary,
         lineHeight: 20,
     },
     termsLink: {
+        fontSize: fontSizes.bodySmall,
+        fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.accent.magenta,
+        lineHeight: 20,
     },
     dividerContainer: {
         flexDirection: 'row',
@@ -266,7 +312,7 @@ const styles = StyleSheet.create({
         backgroundColor: theme.border.default,
     },
     dividerText: {
-        fontSize: 14,
+        fontSize: fontSizes.bodySmall,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.muted,
         marginHorizontal: 15,
@@ -289,12 +335,12 @@ const styles = StyleSheet.create({
         borderColor: theme.border.default,
     },
     socialIcon: {
-        fontSize: 20,
+        fontSize: fontSizes.h4,
         marginRight: 8,
         color: theme.text.primary,
     },
     socialText: {
-        fontSize: 16,
+        fontSize: fontSizes.body,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.primary,
     },
@@ -302,14 +348,15 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
+        marginTop: 20,
     },
     signInText: {
-        fontSize: 14,
+        fontSize: fontSizes.bodySmall,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.secondary,
     },
     signInLink: {
-        fontSize: 14,
+        fontSize: fontSizes.bodySmall,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.accent.magenta,
         fontWeight: '600',

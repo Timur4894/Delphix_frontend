@@ -1,38 +1,70 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import React, { useState, useContext } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AuthStackParamList } from "../../navigation/stackNavigation/AuthNavigation";
 import theme from "../../constants/colors";
 import GradientBtn from "../../components/GradientBtn";
+import { fontSizes } from "../../utils/fontSizes";
+import { loginApi } from "../../api/authApi";
+import { AuthContext } from "../../context/AuthContext";
+import MailSvg from "../../assets/svg/MailSvg";
+import LockSvg from "../../assets/svg/LockSvg";
+import EyeOpenSvg from "../../assets/svg/EyeOpenSvg";
+import EyeClosedSvg from "../../assets/svg/EyeClosedSvg";
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
 const LoginScreen = () => {
     const navigation = useNavigation<LoginScreenNavigationProp>();
+    const { login } = useContext(AuthContext);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [rememberMe, setRememberMe] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [loading, setLoading] = useState(false);
+    
+    const handleLogin = async () => {
+        if (!email || !password) {
+            Alert.alert("Error", "Please fill in all fields");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const response = await loginApi(email, password);
+            if (response.access_token) {
+                // Сохраняем токен и профиль пользователя в контекст
+                // response может содержать user или мы используем данные из response
+                const userData = response.user || { email, id: response.id };
+                console.log('userData: ', userData);
+                console.log('response.access_token: ', response.access_token);
+                await login(userData, response.access_token);
+                // Navigation will be handled by AppContent based on token
+            }
+        } catch (error: any) {
+            Alert.alert(
+                "Login Failed", 
+                error.response?.data?.message || error.message || "An error occurred during login"
+            );
+        } finally {
+            setLoading(false);
+        }
+    }
 
     return (
-        <View style={styles.container} >
-            
-
-            {/* Logo and Title */}
-            <View style={styles.logoContainer}>
+        <ScrollView style={styles.container} >
+                        <View style={styles.logoContainer}>
                 <Text style={styles.logoText}>
                     <Text style={styles.logoTextAccent}>Delphix</Text>
                 </Text>
             </View>
 
-            {/* Main Title */}
             <Text style={styles.mainTitle}>Sign in to your account</Text>
             <Text style={styles.subtitle}>Welcome back! Select method to log in</Text>
 
-            {/* Email Input */}
             <View style={styles.inputContainer}>
-                <Text style={styles.inputIcon}>✉️</Text>
+                <MailSvg width={24} height={24} color={theme.accent.magenta} style={{marginRight: 12}}/>
                 <TextInput
                     style={styles.input}
                     placeholder="Enter Your Email"
@@ -44,9 +76,8 @@ const LoginScreen = () => {
                 />
             </View>
 
-            {/* Password Input */}
             <View style={styles.inputContainer}>
-                <Text style={styles.inputIcon}>🔒</Text>
+                <LockSvg width={24} height={24} color={theme.accent.magenta} style={{marginRight: 12}}/>
                 <TextInput
                     style={styles.input}
                     placeholder="Enter Your Password"
@@ -56,49 +87,27 @@ const LoginScreen = () => {
                     secureTextEntry={!showPassword}
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                    <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                    {showPassword ? <EyeClosedSvg width={24} height={24} color={theme.accent.magenta} style={{marginRight: 12}}/> : <EyeOpenSvg width={24} height={24} color={theme.accent.magenta} style={{marginRight: 12}}/>}
                 </TouchableOpacity>
             </View>
 
             <View style={styles.optionsRow}>
-                <TouchableOpacity 
-                    style={styles.checkboxContainer}
-                    onPress={() => setRememberMe(!rememberMe)}
-                >
-                    <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                        {rememberMe && <Text style={styles.checkmark}>✓</Text>}
-                    </View>
-                    <Text style={styles.checkboxLabel}>Remember me</Text>
-                </TouchableOpacity>
                 <TouchableOpacity>
                     <Text style={styles.forgetPassword}>Forget Password?</Text>
                 </TouchableOpacity>
             </View>
 
             <GradientBtn 
-                text="Log In" 
-                onPress={() => {
-                    // TODO: Implement login logic
-                    console.log('Login:', { email, password, rememberMe });
-                }} 
+                text={loading ? "Logging in..." : "Log In"} 
+                onPress={loading ? () => {} : handleLogin}
             />
-
-            <View style={styles.dividerContainer}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>Or Continue With</Text>
-                <View style={styles.dividerLine} />
-            </View>
-
-            <View style={styles.socialContainer}>
-                <TouchableOpacity style={styles.socialButton}>
-                    <Text style={styles.socialIcon}>G</Text>
-                    <Text style={styles.socialText}>Google</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.socialButton}>
-                    <Text style={styles.socialIcon}>🍎</Text>
-                    <Text style={styles.socialText}>Apple</Text>
-                </TouchableOpacity>
-            </View>
+            {loading && (
+                <ActivityIndicator 
+                    size="small" 
+                    color={theme.accent.magenta} 
+                    style={{ marginTop: 10 }} 
+                />
+            )}
 
             <View style={styles.signUpContainer}>
                 <Text style={styles.signUpText}>Don't have an account? </Text>
@@ -106,7 +115,7 @@ const LoginScreen = () => {
                     <Text style={styles.signUpLink}>Sign up</Text>
                 </TouchableOpacity>
             </View>
-        </View>
+        </ScrollView>
     );
 };
 
@@ -114,8 +123,9 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         paddingHorizontal: 20,
+        paddingTop: 70,
         backgroundColor: theme.background.primary,
-        justifyContent: 'center',
+        // justifyContent: 'center',
     },
 
     backButton: {
@@ -123,7 +133,7 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     backIcon: {
-        fontSize: 24,
+        fontSize: fontSizes.h3,
         color: theme.accent.magenta,
         fontFamily: 'ZalandoSansExpanded-Italic',
     },
@@ -132,11 +142,11 @@ const styles = StyleSheet.create({
         marginBottom: 30,
     },
     logo: {
-        fontSize: 60,
+        fontSize: fontSizes.xlarge,
         marginBottom: 10,
     },
     logoText: {
-        fontSize: 32,
+        fontSize: fontSizes.h2,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.primary,
     },
@@ -145,14 +155,14 @@ const styles = StyleSheet.create({
         fontWeight: '900',
     },
     mainTitle: {
-        fontSize: 28,
+        fontSize: fontSizes.h2,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.primary,
         marginBottom: 8,
         textAlign: 'center',
     },
     subtitle: {
-        fontSize: 14,
+        fontSize: fontSizes.bodySmall,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.secondary,
         marginBottom: 30,
@@ -169,23 +179,23 @@ const styles = StyleSheet.create({
         borderColor: theme.border.default,
     },
     inputIcon: {
-        fontSize: 20,
+        fontSize: fontSizes.h4,
         marginRight: 10,
     },
     input: {
         flex: 1,
-        fontSize: 16,
+        fontSize: fontSizes.body,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.primary,
         paddingVertical: 15,
     },
     eyeIcon: {
-        fontSize: 20,
+        fontSize: fontSizes.h4,
         marginLeft: 10,
     },
     optionsRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-end',
         alignItems: 'center',
         marginBottom: 25,
     },
@@ -208,16 +218,16 @@ const styles = StyleSheet.create({
     },
     checkmark: {
         color: theme.text.primary,
-        fontSize: 12,
+        fontSize: fontSizes.caption,
         fontWeight: 'bold',
     },
     checkboxLabel: {
-        fontSize: 14,
+        fontSize: fontSizes.bodySmall,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.secondary,
     },
     forgetPassword: {
-        fontSize: 14,
+        fontSize: fontSizes.bodySmall,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.accent.magenta,
     },
@@ -232,7 +242,7 @@ const styles = StyleSheet.create({
         backgroundColor: theme.border.default,
     },
     dividerText: {
-        fontSize: 14,
+        fontSize: fontSizes.bodySmall,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.muted,
         marginHorizontal: 15,
@@ -255,12 +265,12 @@ const styles = StyleSheet.create({
         borderColor: theme.border.default,
     },
     socialIcon: {
-        fontSize: 20,
+        fontSize: fontSizes.h4,
         marginRight: 8,
         color: theme.text.primary,
     },
     socialText: {
-        fontSize: 16,
+        fontSize: fontSizes.body,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.primary,
     },
@@ -268,14 +278,15 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
+        marginTop: 20,
     },
     signUpText: {
-        fontSize: 14,
+        fontSize: fontSizes.bodySmall,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.secondary,
     },
     signUpLink: {
-        fontSize: 14,
+        fontSize: fontSizes.bodySmall,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.accent.magenta,
         fontWeight: '600',

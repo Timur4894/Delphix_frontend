@@ -4,13 +4,16 @@ import StockInfoScreen from "../../screens/StockInfoScreen";
 import AddTransactionScreen from "../../screens/additional/AddTransactionScreen";
 import TransactionHistoryScreen from "../../screens/additional/TransactionHistoryScreen";
 import SettingsScreen from "../../screens/additional/SettingsScreen";
+import CompanyInfoScreen from "../../screens/additional/CompanyInfoScreen";
 
 export type MainStackParamList = {
     BottomNavigation: undefined;
     StockInfo: { ticker?: string; companyName?: string };
-    AddTransaction: undefined;
+    AddTransaction: { name?: string; shortName?: string; img?: any } | undefined;
     TransactionHistory: undefined;
     Settings: undefined;
+    CompanyInfo: { name: string; shortName: string; img: any };
+    MyPortfolio: undefined;
 };
 
 const MainNavigation = () => {
@@ -19,7 +22,7 @@ const MainNavigation = () => {
     return (
         <Stack.Navigator
             screenOptions={{
-                headerShown: true,
+                headerShown: false,
             }}
         >
             <Stack.Screen 
@@ -46,6 +49,11 @@ const MainNavigation = () => {
                 name="Settings" 
                 component={SettingsScreen}
                 options={{ title: 'Settings' }}
+            />
+            <Stack.Screen 
+                name="CompanyInfo" 
+                component={CompanyInfoScreen}
+                options={{ title: 'Company Info' }}
             />
         </Stack.Navigator>
     );

@@ -4,6 +4,8 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { AuthStackParamList } from "../navigation/stackNavigation/AuthNavigation";
 import theme from "../constants/colors";
 import GradientBtn from "../components/GradientBtn";
+import LottieView from "lottie-react-native";
+import { fontSizes } from "../utils/fontSizes";
 
 const WelcomeScreen = () => {
     const navigation = useNavigation();
@@ -12,11 +14,16 @@ const WelcomeScreen = () => {
         <View style={styles.container}>
             <Text style={styles.title}><Text style={[styles.title, {color: theme.accent.magenta, fontWeight: 900}]}>Delphix</Text> - simple & reliable</Text>
             
-            <View>
-                <Text style={styles.subtitle}>Earn with top brands
-                    - buy shares with your
-                    card and track your portfolio
-                </Text>
+            <LottieView 
+                    source={require('../assets/lottie/Growth.json')} 
+                    autoPlay 
+                    style={{ width: '100%', height: '30%'}}
+                    loop
+                />
+
+            <View style={{alignItems: 'center', marginTop: 70}}>
+                
+                
                 <Text style={styles.subtitle}>AI-powered forecasts
                     - get real-time predictions for your investments
                     - make informed decisions with confidence
@@ -25,7 +32,7 @@ const WelcomeScreen = () => {
             </View>
             
             
-            <GradientBtn text="Next" onPress={() => navigation.replace('Registration')} />   
+            <GradientBtn stylesContainer={{alignSelf: 'center', position: 'absolute', bottom:50}} text="Next" onPress={() => navigation.replace('Registration')} />   
         </View>
     );
 };
@@ -33,21 +40,25 @@ const WelcomeScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        paddingTop: 100,
         paddingHorizontal: 20,
-        justifyContent: 'space-around',
+        flexDirection: 'column',
+        // justifyContent: 'center',
+    
+        // justifyContent: 'space-around',
         backgroundColor: theme.background.primary,
         // justifyContent: 'center',
         alignItems: 'center',
 
     },
     title: {
-        fontSize: 34,
+        fontSize: fontSizes.h1,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.primary,
     },
     subtitle: {
-        fontSize: 16,
-        marginBottom: 20,
+        fontSize: fontSizes.body,
+        // marginBottom: 20,
         fontFamily: 'ZalandoSansExpanded-Italic',
         color: theme.text.secondary,
     },
