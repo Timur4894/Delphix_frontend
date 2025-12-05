@@ -1,5 +1,5 @@
-import React, { useContext } from "react";
-import { Text, View, TouchableOpacity, StyleSheet, ScrollView, ImageBackground } from "react-native";
+import React, { useContext, useState, useEffect } from "react";
+import { Text, View, TouchableOpacity, StyleSheet, ScrollView, ImageBackground, ActivityIndicator } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "../../navigation/stackNavigation/MainNavigation";
@@ -7,22 +7,41 @@ import theme from "../../constants/colors";
 import EditSvg from "../../assets/svg/EditSvg";
 import { fontSizes, spacing, sizes } from "../../utils/fontSizes";
 import { AuthContext } from "../../context/AuthContext";
+import { getMyPortfolioApi } from "../../api/portfolioApi";
 
 
 const ProfileScreen = ({navigation}: {navigation: NativeStackNavigationProp<MainStackParamList>}) => {
-    const { logout } = useContext(AuthContext);
+    const { logout, user } = useContext(AuthContext);
+    const [portfolio, setPortfolio] = useState(null);
+    const [portfolioLoading, setPortfolioLoading] = useState(true);
+
+    const handleEditProfile = () => {
+        navigation.navigate('EditProfile');
+    };
     
-    const stats = [
-        { label: "AI forecasts", value: "$128,450" },
-        { label: "Risk profile", value: "Stable"  },
-        { label: "Expected yearly return", value: "+10.2%" },
-    ];
+    // useEffect(() => {
+    //     const loadPortfolio = async () => {
+    //         try {
+    //             setPortfolioLoading(true);
+    //             const portfolioData = await getMyPortfolioApi();
+    //             setPortfolio(portfolioData);
+                
+    //         } catch (error) {
+    //             console.error('Error loading portfolio:', error);
+    //         } finally {
+    //             setPortfolioLoading(false);
+    //         }
+    //     };
+
+    //     if (user) {
+    //         loadPortfolio();
+    //     }
+    // }, [user]);
 
     const accountInfo = [
-        { label: "Country", value: "Ukraine" },
-        { label: "Email", value: "tymur.latush@gmail.com" },
-        { label: "Name", value: "Tymur Latush" },
-        { label: "Phone", value: "+380991234567" },
+        { label: "Email", value: user?.user.email || "N/A" },
+        { label: "Name", value: user?.user.user_name || "N/A" },
+        { label: "User ID", value: user?.user.id?.toString() || "N/A" },
     ];
 
     const handleLogout = async () => {
@@ -33,21 +52,36 @@ const ProfileScreen = ({navigation}: {navigation: NativeStackNavigationProp<Main
         }
     };
 
+    if (!user) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={theme.accent.magenta} />
+            </View>
+        );
+    }
+
     return (
         <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
             <ImageBackground
-                source={require('../../assets/img/profile.jpeg')}
+                source={{uri: user?.user?.avatar}}
                 imageStyle={{ borderRadius: 30 }}
                 style={styles.header}
             >
+                {!user?.user?.avatar && (
+                    <View style={styles.avatarPlaceholder}>
+                        <Text style={styles.avatarPlaceholderText}>{user?.user?.user_name?.charAt(0) || "U"}</Text>
+                    </View>
+                )}
+                <TouchableOpacity style={styles.editBtn} onPress={handleEditProfile}>
+                    <EditSvg width={24} height={24} color={theme.text.primary} />
+                </TouchableOpacity>
                  <View style={styles.headerOverlay}>
-                    <Text style={styles.title}>Tymur Latush</Text>
-                    <Text style={styles.email}>tymur.latush@gmail.com</Text>
+                    <Text style={styles.title}>{user?.user?.user_name || user?.user?.name || "User"}</Text>
+                    <Text style={styles.email}>{user?.user?.email || "No email"}</Text>
                     {/* <View style={styles.badge}>
                         <Text style={styles.badgeText}>Premium plan</Text>
                     </View> */}
                 </View>
-                
             </ImageBackground>
 
             <View style={styles.contentWrapper}>
@@ -55,15 +89,14 @@ const ProfileScreen = ({navigation}: {navigation: NativeStackNavigationProp<Main
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <View>
                             <Text style={styles.cardTitle}>Net worth</Text>
-                            <Text style={styles.cardValue}>$214,230.50</Text>
+                            
+                                <Text style={styles.cardValue}>
+                                    $0
+                                </Text>
+                    
                         </View>
                     </View>
                 </View>
-
-                
-
-              
-
                 <Text style={styles.sectionTitle}>Account details</Text>
                 <View style={styles.listCard}>
                     {accountInfo.map((item, idx) => (
@@ -96,6 +129,8 @@ const styles = StyleSheet.create({
         height: spacing.verticalXxl * 12,
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: theme.background.secondary,
+        borderRadius: spacing.xxl,
     },
     headerOverlay: {
         backgroundColor: 'rgba(0, 0, 0, 0.45)',
@@ -105,6 +140,19 @@ const styles = StyleSheet.create({
         bottom: spacing.xxl,
         width: '85%',
         alignItems: 'center',
+    },
+    avatarPlaceholder: {
+        justifyContent: 'center',
+        alignItems: 'center',
+       
+        borderRadius: 99,
+        padding: spacing.md,
+    },
+    avatarPlaceholderText: {
+        fontSize: 80,
+        fontWeight: 'bold',
+        color: theme.text.primary,
+        fontFamily: 'ZalandoSansExpanded-Italic',
     },
     editBtn: {
         position: 'absolute',

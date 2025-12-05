@@ -1,16 +1,21 @@
 import { View, Image, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { fontSizes, spacing, sizes } from "../utils/fontSizes";
 import theme from "../constants/colors";
+import { getCompanyImage } from "../utils/companyImage";
 
 interface SelectableStockItemProps {
-    img: any;
+    img?: any;
+    logoUrl?: string | null;
     name: string;
     shortName: string;
     isSelected: boolean;
     onPress: () => void;
 }
 
-const SelectableStockItem = ({ img, name, shortName, isSelected, onPress }: SelectableStockItemProps) => {
+const SelectableStockItem = ({ img, logoUrl, name, shortName, isSelected, onPress }: SelectableStockItemProps) => {
+    // Используем logoUrl если есть, иначе img, иначе дефолтное изображение
+    const imageSource = logoUrl ? getCompanyImage(logoUrl) : (img || getCompanyImage());
+    
     return (
         <TouchableOpacity 
             style={[
@@ -19,7 +24,7 @@ const SelectableStockItem = ({ img, name, shortName, isSelected, onPress }: Sele
             ]} 
             onPress={onPress}
         >
-            <Image source={img} style={styles.image} resizeMode="contain" />
+            <Image source={imageSource} style={styles.image} resizeMode="contain" />
             <View style={styles.nameContainer}>
                 <Text style={styles.name}>{name}</Text>
                 <Text style={styles.shortName}>{shortName}</Text>

@@ -9,6 +9,8 @@ import GradientBtn from "../../components/GradientBtn";
 import SelectableStockItem from "../../components/SelectableStockItem";
 import BackSvg from "../../assets/svg/BackSvg";
 import Header from "../../components/Header";
+import { getCompanyImage } from "../../utils/companyImage";
+import { searchCompaniesApi } from "../../api/companyApi";
 
 type AddTransactionScreenNavigationProp = NativeStackNavigationProp<MainStackParamList, 'AddTransaction'>;
 type AddTransactionScreenRouteProp = RouteProp<MainStackParamList, 'AddTransaction'>;
@@ -17,24 +19,44 @@ const AddTransactionScreen = () => {
     const navigation = useNavigation<AddTransactionScreenNavigationProp>();
     const route = useRoute<AddTransactionScreenRouteProp>();
     const [transactionType, setTransactionType] = useState<'buy' | 'sell'>('buy');
-    const [selectedStock, setSelectedStock] = useState<{name: string, shortName: string, img: any} | null>(null);
+    const [selectedStock, setSelectedStock] = useState<{name: string, shortName: string, img: any, logoUrl?: string | null} | null>(null);
     const [quantity, setQuantity] = useState("");
     const [price, setPrice] = useState("");
     const [note, setNote] = useState("");
 
-    const stock = { name: "Apple", shortName: "AAPL", img: require('../../assets/img/appleLogo.png') }
-    
-
-    // Устанавливаем выбранную компанию из параметров навигации
+    // Устанавливаем выбранную компанию из параметров навигации и загружаем актуальную цену
     useEffect(() => {
-        if (route.params?.name && route.params?.shortName && route.params?.img) {
-            const stockFromParams = {
-                name: route.params.name,
-                shortName: route.params.shortName,
-                img: route.params.img,
-            };
-            setSelectedStock(stockFromParams);
-        }
+        const loadCompanyData = async () => {
+            if (route.params?.name && route.params?.shortName) {
+                const imageSource = route.params.logoUrl 
+                    ? getCompanyImage(route.params.logoUrl) 
+                    : (route.params.img || getCompanyImage());
+                
+                const stockFromParams = {
+                    name: route.params.name,
+                    shortName: route.params.shortName,
+                    img: imageSource,
+                    logoUrl: route.params.logoUrl,
+                };
+                setSelectedStock(stockFromParams);
+
+                // Загружаем актуальную цену компании
+                try {
+                    const searchResult = await searchCompaniesApi(route.params.shortName, 1, 1);
+                    const companies = searchResult.data || searchResult || [];
+                    const company = companies.find((c: any) => c.ticker === route.params.shortName) || companies[0];
+                    
+                    if (company && company.current_price) {
+                        // Автозаполняем цену актуальной ценой из API
+                        setPrice(company.current_price.toString());
+                    }
+                } catch (error) {
+                    console.error('Error loading company price:', error);
+                }
+            }
+        };
+
+        loadCompanyData();
     }, [route.params]);
 
     const handleSubmit = () => {
@@ -76,17 +98,21 @@ const AddTransactionScreen = () => {
                 </View>
 
                 <Text style={styles.sectionTitle}>Select Company</Text>
-                <View  style={styles.stocksContainer}>
-                    
+                {selectedStock ? (
+                    <View style={styles.stocksContainer}>
                         <SelectableStockItem 
-                            img={stock.img}
-                            name={stock.name}
-                            shortName={stock.shortName}
-                            isSelected={selectedStock?.shortName === stock.shortName}
-                            onPress={() => setSelectedStock(stock)}
+                            logoUrl={selectedStock.logoUrl}
+                            name={selectedStock.name}
+                            shortName={selectedStock.shortName}
+                            isSelected={true}
+                            onPress={() => {}}
                         />
-                 
-                </View>
+                    </View>
+                ) : (
+                    <View style={styles.stocksContainer}>
+                        <Text style={styles.noCompanyText}>No company selected</Text>
+                    </View>
+                )}
 
                 <Text style={styles.sectionTitle}>Quantity</Text>
                 <View style={styles.inputContainer}>
@@ -298,6 +324,13 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: theme.accent.magenta,
         fontFamily: 'ZalandoSansExpanded-Italic',
+    },
+    noCompanyText: {
+        fontSize: fontSizes.body,
+        color: theme.text.secondary,
+        fontFamily: 'ZalandoSansExpanded-Italic',
+        textAlign: 'center',
+        padding: spacing.xl,
     },
 });
 

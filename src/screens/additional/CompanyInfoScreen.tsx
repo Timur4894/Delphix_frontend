@@ -1,5 +1,5 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ImageBackground } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ImageBackground, ActivityIndicator } from "react-native";
 import { useRoute, RouteProp } from "@react-navigation/native";
 import { MainStackParamList } from "../../navigation/stackNavigation/MainNavigation";
 import { useNavigation } from "@react-navigation/native";
@@ -8,6 +8,8 @@ import Header from "../../components/Header";
 import theme from "../../constants/colors";
 import { fontSizes, spacing, sizes } from "../../utils/fontSizes";
 import GradientBtn from "../../components/GradientBtn";
+import { getCompanyImage } from "../../utils/companyImage";
+import { getCompanyByIdApi, searchCompaniesApi } from "../../api/companyApi";
 
 type CompanyInfoScreenRouteProp = RouteProp<MainStackParamList, 'CompanyInfo'>;
 type CompanyInfoScreenNavigationProp = NativeStackNavigationProp<MainStackParamList>;
@@ -15,28 +17,53 @@ type CompanyInfoScreenNavigationProp = NativeStackNavigationProp<MainStackParamL
 const CompanyInfoScreen = () => {
     const route = useRoute<CompanyInfoScreenRouteProp>();
     const navigation = useNavigation<CompanyInfoScreenNavigationProp>();
-    const { name, shortName, img } = route.params;
+    const { name, shortName, img, logoUrl, id } = route.params;
+    
+    const [companyData, setCompanyData] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    
+    // Используем logoUrl если есть, иначе img, иначе дефолтное изображение
+    const imageSource = logoUrl ? getCompanyImage(logoUrl) : (img || getCompanyImage());
 
-    // Mock data - в реальном приложении это будет приходить с API
-    const stockData = {
-        currentPrice: 124.50,
-        change: 2.35,
-        changePercent: 1.92,
-        marketCap: "2.8T",
-        volume: "45.2M",
-        high52w: 182.94,
-        low52w: 124.17,
-        pe: 28.5,
-        dividend: 0.24,
-    };
+    // Загружаем данные компании из API
+    useEffect(() => {
+        const loadCompanyData = async () => {
+            try {
+                setLoading(true);
+                let data;
+                
+                // Если есть ID, загружаем по ID, иначе ищем по тикеру
+                if (id) {
+                    data = await getCompanyByIdApi(id);
+                } else if (shortName) {
+                    const searchResult = await searchCompaniesApi(shortName, 1, 1);
+                    const companies = searchResult.data || searchResult || [];
+                    data = companies.find((c: any) => c.ticker === shortName) || companies[0];
+                }
+                
+                if (data) {
+                    setCompanyData(data);
+                }
+            } catch (error) {
+                console.error('Error loading company data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadCompanyData();
+    }, [id, shortName]);
+
+    // Используем данные из API или дефолтные значения
+    const currentPrice = companyData?.current_price || 0;
+    const priceChange = companyData?.price_change || 0;
+    const priceChangePercent = companyData?.price_change_percent || 0;
 
     const stats = [
-        { label: "Market Cap", value: `$${stockData.marketCap}` },
-        { label: "Volume", value: stockData.volume },
-        { label: "52W High", value: `$${stockData.high52w}` },
-        { label: "52W Low", value: `$${stockData.low52w}` },
-        { label: "P/E Ratio", value: stockData.pe.toString() },
-        { label: "Dividend", value: `${stockData.dividend}%` },
+        { label: "Ticker", value: shortName },
+        { label: "Current Price", value: currentPrice > 0 ? `$${currentPrice.toFixed(2)}` : "N/A" },
+        { label: "Price Change", value: priceChange !== 0 ? `${priceChange >= 0 ? '+' : ''}$${priceChange.toFixed(2)}` : "N/A" },
+        { label: "Change %", value: priceChangePercent !== 0 ? `${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%` : "N/A" },
     ];
 
     return (
@@ -46,7 +73,7 @@ const CompanyInfoScreen = () => {
             <View style={styles.content}>
                 {/* Company Header */}
                 <View style={styles.companyHeader}>
-                    <Image source={img} style={styles.companyLogo} resizeMode="contain" />
+                    <Image source={imageSource} style={styles.companyLogo} resizeMode="contain" />
                     <View style={styles.companyInfo}>
                         <Text style={styles.companyName}>{name}</Text>
                         <Text style={styles.ticker}>{shortName}</Text>
@@ -62,16 +89,26 @@ const CompanyInfoScreen = () => {
                 >
                     <View style={styles.priceContent}>
                         <Text style={styles.priceLabel}>Current Price</Text>
-                        <Text style={styles.priceValue}>${stockData.currentPrice.toFixed(2)}</Text>
-                        <View style={styles.changeContainer}>
-                            <Text style={[
-                                styles.changeText,
-                                stockData.change >= 0 ? styles.changePositive : styles.changeNegative
-                            ]}>
-                                {stockData.change >= 0 ? '+' : ''}{stockData.change.toFixed(2)} 
-                                ({stockData.change >= 0 ? '+' : ''}{stockData.changePercent.toFixed(2)}%)
-                            </Text>
-                        </View>
+                        {loading ? (
+                            <ActivityIndicator size="large" color="#fff" style={{ marginVertical: spacing.lg }} />
+                        ) : currentPrice > 0 ? (
+                            <>
+                                <Text style={styles.priceValue}>${currentPrice.toFixed(2)}</Text>
+                                {(priceChange !== 0 || priceChangePercent !== 0) && (
+                                    <View style={styles.changeContainer}>
+                                        <Text style={[
+                                            styles.changeText,
+                                            priceChange >= 0 ? styles.changePositive : styles.changeNegative
+                                        ]}>
+                                            {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)} 
+                                            ({priceChangePercent >= 0 ? '+' : ''}{priceChangePercent.toFixed(2)}%)
+                                        </Text>
+                                    </View>
+                                )}
+                            </>
+                        ) : (
+                            <Text style={styles.priceValue}>Price not available</Text>
+                        )}
                     </View>
                 </ImageBackground>
 
@@ -93,7 +130,8 @@ const CompanyInfoScreen = () => {
                         onPress={() => navigation.navigate('AddTransaction', { 
                             name, 
                             shortName, 
-                            img 
+                            img: imageSource,
+                            logoUrl 
                         })}
                     >
                         <Text style={styles.actionButtonText}>Add transaction</Text>
@@ -102,14 +140,16 @@ const CompanyInfoScreen = () => {
                 </View>
 
                 {/* About Section */}
-                <Text style={styles.sectionTitle}>About {name}</Text>
-                <View style={styles.aboutCard}>
-                    <Text style={styles.aboutText}>
-                        {name} Inc. is a leading technology company that designs, develops, and sells consumer electronics, 
-                        computer software, and online services. The company is known for its innovative products and services 
-                        that have revolutionized the technology industry.
-                    </Text>
-                </View>
+                {companyData?.description && (
+                    <>
+                        <Text style={styles.sectionTitle}>About {name}</Text>
+                        <View style={styles.aboutCard}>
+                            <Text style={styles.aboutText}>
+                                {companyData.description}
+                            </Text>
+                        </View>
+                    </>
+                )}
             </View>
         </ScrollView>
     );

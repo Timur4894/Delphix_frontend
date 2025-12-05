@@ -1,5 +1,5 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ImageBackground } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ImageBackground, ActivityIndicator } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "../../navigation/stackNavigation/MainNavigation";
@@ -7,72 +7,76 @@ import Header from "../../components/Header";
 import theme from "../../constants/colors";
 import { fontSizes, spacing, sizes } from "../../utils/fontSizes";
 import GradientBtn from "../../components/GradientBtn";
+import { getMyPortfolioApi } from "../../api/portfolioApi";
+import { getCompanyImage } from "../../utils/companyImage";
 
 type MyPortfolioScreenNavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
 const PortfolioScreen = () => {
     const navigation = useNavigation<MyPortfolioScreenNavigationProp>();
+    const [portfolio, setPortfolio] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [portfolioData, setPortfolioData] = useState({
+        totalValue: 0,
+        totalChange: 0,
+        totalChangePercent: 0,
+        totalCost: 0,
+        totalProfit: 0,
+        totalProfitPercent: 0,
+    });
 
-    // Mock data - в реальном приложении это будет приходить с API
-    const portfolioData = {
-        totalValue: 12154.65,
-        totalChange: 1123.32,
-        totalChangePercent: 1.23,
-        totalCost: 11031.33,
-        totalProfit: 1123.32,
-        totalProfitPercent: 10.18,
+    // Загружаем портфель из API
+    useEffect(() => {
+        const loadPortfolio = async () => {
+            try {
+                setLoading(true);
+                const response = await getMyPortfolioApi();
+                const portfolioItems = Array.isArray(response) ? response : (response.data || []);
+                setPortfolio(portfolioItems);
+
+                // Рассчитываем общую статистику
+                if (portfolioItems.length > 0) {
+                    const totalValue = portfolioItems.reduce((sum, item) => sum + (item.current_value || 0), 0);
+                    const totalCost = portfolioItems.reduce((sum, item) => sum + (item.total_invested || 0), 0);
+                    const totalProfit = totalValue - totalCost;
+                    const totalProfitPercent = totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
+
+                    setPortfolioData({
+                        totalValue,
+                        totalChange: 0, // Можно рассчитать из price_change
+                        totalChangePercent: 0,
+                        totalCost,
+                        totalProfit,
+                        totalProfitPercent,
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading portfolio:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadPortfolio();
+    }, []);
+
+    // Форматируем данные портфеля для отображения
+    const formatHolding = (item: any) => {
+        return {
+            id: item.id || item.company_id,
+            name: item.company?.name || item.name || 'Unknown',
+            shortName: item.company?.ticker || item.ticker || 'N/A',
+            logoUrl: item.company?.logo_url || item.logo_url,
+            quantity: item.shares || 0,
+            avgPrice: item.avg_price || 0,
+            currentPrice: item.current_price || 0,
+            value: item.current_value || 0,
+            profit: item.profit_loss || 0,
+            profitPercent: item.profit_loss_percent || 0,
+        };
     };
 
-    const holdings = [
-        {
-            id: 1,
-            name: "Apple",
-            shortName: "AAPL",
-            img: require('../../assets/img/appleLogo.png'),
-            quantity: 10,
-            avgPrice: 150.00,
-            currentPrice: 175.50,
-            value: 1755.00,
-            profit: 255.00,
-            profitPercent: 17.00,
-        },
-        {
-            id: 2,
-            name: "Tesla",
-            shortName: "TSLA",
-            img: require('../../assets/img/logo.jpg'),
-            quantity: 5,
-            avgPrice: 200.00,
-            currentPrice: 245.30,
-            value: 1226.50,
-            profit: 226.50,
-            profitPercent: 22.65,
-        },
-        {
-            id: 3,
-            name: "Microsoft",
-            shortName: "MSFT",
-            img: require('../../assets/img/appleLogo.png'),
-            quantity: 8,
-            avgPrice: 300.00,
-            currentPrice: 380.25,
-            value: 3042.00,
-            profit: 642.00,
-            profitPercent: 26.75,
-        },
-        {
-            id: 4,
-            name: "Google",
-            shortName: "GOOGL",
-            img: require('../../assets/img/appleLogo.png'),
-            quantity: 3,
-            avgPrice: 120.00,
-            currentPrice: 135.50,
-            value: 406.50,
-            profit: 46.50,
-            profitPercent: 12.92,
-        },
-    ];
+    const holdings = portfolio.map(formatHolding);
 
     const stats = [
         { label: "Total Cost", value: `$${portfolioData.totalCost.toFixed(2)}` },
@@ -122,18 +126,24 @@ const PortfolioScreen = () => {
                     <Text style={styles.holdingsCount}>{holdings.length} stocks</Text>
                 </View>
 
-                {holdings.map((holding) => (
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color={theme.accent.magenta} />
+                    </View>
+                ) : holdings.length > 0 ? (
+                    holdings.map((holding) => (
                     <TouchableOpacity
                         key={holding.id}
                         style={styles.holdingCard}
                         onPress={() => navigation.navigate('CompanyInfo', {
                             name: holding.name,
                             shortName: holding.shortName,
-                            img: holding.img,
+                            logoUrl: holding.logoUrl,
+                            id: holding.id,
                         })}
                     >
                         <View style={styles.holdingHeader}>
-                            <Image source={holding.img} style={styles.holdingLogo} resizeMode="contain" />
+                            <Image source={getCompanyImage(holding.logoUrl)} style={styles.holdingLogo} resizeMode="contain" />
                             <View style={styles.holdingInfo}>
                                 <Text style={styles.holdingName}>{holding.name}</Text>
                                 <Text style={styles.holdingTicker}>{holding.shortName}</Text>
@@ -163,7 +173,13 @@ const PortfolioScreen = () => {
                             </View>
                         </View>
                     </TouchableOpacity>
-                ))}
+                    ))
+                ) : (
+                    <View style={styles.emptyState}>
+                        <Text style={styles.emptyText}>No holdings yet</Text>
+                        <Text style={styles.emptySubtext}>Start investing to see your portfolio here</Text>
+                    </View>
+                )}
 
                 {/* Quick Actions */}
                 <View style={styles.actionsContainer}>
@@ -377,6 +393,27 @@ const styles = StyleSheet.create({
     },
     secondaryButtonText: {
         color: theme.accent.magenta,
+    },
+    loadingContainer: {
+        padding: spacing.xxl,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: spacing.verticalXxl * 3,
+    },
+    emptyText: {
+        fontSize: fontSizes.h4,
+        fontWeight: 'bold',
+        color: theme.text.primary,
+        fontFamily: 'ZalandoSansExpanded-Italic',
+        marginBottom: spacing.sm,
+    },
+    emptySubtext: {
+        fontSize: fontSizes.bodySmall,
+        color: theme.text.muted,
+        fontFamily: 'ZalandoSansExpanded-Italic',
     },
 });
 

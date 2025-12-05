@@ -16,6 +16,21 @@ indexApi.interceptors.request.use(
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+        // Если это FormData, удаляем Content-Type чтобы браузер установил его с boundary
+        if (config.data instanceof FormData) {
+            delete config.headers['Content-Type'];
+            console.log('FormData detected, removed Content-Type header');
+        } else {
+            // Убеждаемся что для JSON установлен правильный Content-Type
+            config.headers['Content-Type'] = 'application/json';
+        }
+        console.log('Request config:', {
+            url: config.url,
+            method: config.method,
+            hasData: !!config.data,
+            isFormData: config.data instanceof FormData,
+            contentType: config.headers['Content-Type']
+        });
         return config;
     },
     (error) => {

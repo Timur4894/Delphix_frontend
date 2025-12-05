@@ -1,56 +1,110 @@
-import React, { useState } from "react";
-import { Text, View, TouchableOpacity, StyleSheet, ScrollView, Image, TextInput } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { Text, View, TouchableOpacity, StyleSheet, ScrollView, Image, TextInput, ActivityIndicator } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "../../navigation/stackNavigation/MainNavigation";
 import theme from "../../constants/colors";
 import { fontSizes, spacing, sizes } from "../../utils/fontSizes";
 import StockItem from "../../components/StockItem";
+import { searchCompaniesApi, getAllCompaniesApi } from "../../api/companyApi";
+import { getCompanyImage } from "../../utils/companyImage";
 
 type SearchScreenNavigationProp = NativeStackNavigationProp<MainStackParamList>;
+
+interface Company {
+    id: number;
+    name: string;
+    ticker: string;
+    logo?: string;
+    logo_url?: string;
+    current_price?: number;
+    price_change?: number;
+    price_change_percent?: number;
+}
 
 const SearchScreen = () => {
     const navigation = useNavigation<SearchScreenNavigationProp>();
     const [searchQuery, setSearchQuery] = useState("");
+    const [topStocks, setTopStocks] = useState<Company[]>([]);
+    const [searchResults, setSearchResults] = useState<Company[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Mock data - в реальном приложении это будет приходить с API
-    const topStocks = [
-        { name: "Apple", shortName: "AAPL", img: require('../../assets/img/appleLogo.png'), price: 175.50, change: 2.35, changePercent: 1.35 },
-        { name: "Tesla", shortName: "TSLA", img: require('../../assets/img/logo.jpg'), price: 245.30, change: -5.20, changePercent: -2.08 },
-        { name: "Microsoft", shortName: "MSFT", img: require('../../assets/img/appleLogo.png'), price: 380.25, change: 8.50, changePercent: 2.29 },
-        { name: "Google", shortName: "GOOGL", img: require('../../assets/img/appleLogo.png'), price: 135.50, change: 1.20, changePercent: 0.89 },
-    ];
+    // Загружаем топ компании при монтировании
+    useEffect(() => {
+        const loadTopCompanies = async () => {
+            try {
+                setLoading(true);
+                const response = await getAllCompaniesApi(1, 10);
+                // API возвращает { data: [...], pagination: {...} }
+                const companies = response.data || response || [];
+                setTopStocks(companies);
+            } catch (error) {
+                console.error('Error loading top companies:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    const allStocks = [
-        { name: "Apple", shortName: "AAPL", img: require('../../assets/img/appleLogo.png'), price: 175.50, change: 2.35, changePercent: 1.35 },
-        { name: "Tesla", shortName: "TSLA", img: require('../../assets/img/logo.jpg'), price: 245.30, change: -5.20, changePercent: -2.08 },
-        { name: "Microsoft", shortName: "MSFT", img: require('../../assets/img/appleLogo.png'), price: 380.25, change: 8.50, changePercent: 2.29 },
-        { name: "Google", shortName: "GOOGL", img: require('../../assets/img/appleLogo.png'), price: 135.50, change: 1.20, changePercent: 0.89 },
-        { name: "Amazon", shortName: "AMZN", img: require('../../assets/img/appleLogo.png'), price: 145.80, change: 3.40, changePercent: 2.39 },
-        { name: "Meta", shortName: "META", img: require('../../assets/img/appleLogo.png'), price: 320.15, change: -2.10, changePercent: -0.65 },
-        { name: "Nvidia", shortName: "NVDA", img: require('../../assets/img/appleLogo.png'), price: 485.20, change: 12.50, changePercent: 2.64 },
-        { name: "Netflix", shortName: "NFLX", img: require('../../assets/img/appleLogo.png'), price: 420.80, change: -3.20, changePercent: -0.76 },
-    ];
+        loadTopCompanies();
+    }, []);
 
-    // Рекомендованные акции (показываются когда нет поискового запроса)
-    const recommendedStocks = [
-        { name: "Apple", shortName: "AAPL", img: require('../../assets/img/appleLogo.png'), price: 175.50, change: 2.35, changePercent: 1.35 },
-        { name: "Microsoft", shortName: "MSFT", img: require('../../assets/img/appleLogo.png'), price: 380.25, change: 8.50, changePercent: 2.29 },
-        { name: "Google", shortName: "GOOGL", img: require('../../assets/img/appleLogo.png'), price: 135.50, change: 1.20, changePercent: 0.89 },
-        { name: "Amazon", shortName: "AMZN", img: require('../../assets/img/appleLogo.png'), price: 145.80, change: 3.40, changePercent: 2.39 },
-        { name: "Nvidia", shortName: "NVDA", img: require('../../assets/img/appleLogo.png'), price: 485.20, change: 12.50, changePercent: 2.64 },
-        { name: "Meta", shortName: "META", img: require('../../assets/img/appleLogo.png'), price: 320.15, change: -2.10, changePercent: -0.65 },
-    ];
+    // Поиск с debounce
+    useEffect(() => {
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+        }
 
-    const filteredStocks = searchQuery
-        ? allStocks.filter(stock =>
-            stock.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            stock.shortName.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-        : [];
+        if (searchQuery.trim().length === 0) {
+            setSearchResults([]);
+            return;
+        }
+
+        if (searchQuery.trim().length < 2) {
+            return;
+        }
+
+        searchTimeoutRef.current = setTimeout(async () => {
+            try {
+                setSearchLoading(true);
+                const response = await searchCompaniesApi(searchQuery.trim(), 1, 20);
+                // API возвращает { data: [...], pagination: {...} }
+                const companies = response.data || response || [];
+                setSearchResults(companies);
+            } catch (error) {
+                console.error('Error searching companies:', error);
+                setSearchResults([]);
+            } finally {
+                setSearchLoading(false);
+            }
+        }, 500); // Debounce 500ms
+
+        return () => {
+            if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+            }
+        };
+    }, [searchQuery]);
+
+    // Преобразуем данные компании для отображения
+    const formatCompanyForDisplay = (company: Company) => {
+        return {
+            id: company.id,
+            name: company.name,
+            shortName: company.ticker,
+            img: getCompanyImage(company.logo_url || company.logo),
+            logoUrl: company.logo_url || company.logo,
+            price: company.current_price !== undefined && company.current_price !== null ? Number(company.current_price) : undefined,
+            change: company.price_change !== undefined && company.price_change !== null ? Number(company.price_change) : undefined,
+            changePercent: company.price_change_percent !== undefined && company.price_change_percent !== null ? Number(company.price_change_percent) : undefined,
+        };
+    };
 
     // Определяем какие акции показывать
-    const displayStocks = searchQuery.length > 0 ? filteredStocks : recommendedStocks;
+    const displayStocks = searchQuery.length > 0 
+        ? searchResults.map(formatCompanyForDisplay)
+        : topStocks.map(formatCompanyForDisplay);
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
@@ -60,14 +114,29 @@ const SearchScreen = () => {
                     <Text style={styles.sectionTitle}>Top Stocks</Text>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.topStocksScroll}>
-                    {topStocks.map((stock, index) => (
-                        <StockItem
-                            key={index}
-                            img={stock.img}
-                            name={stock.name}
-                            shortName={stock.shortName}
-                        />
-                    ))}
+                    {loading ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="small" color={theme.accent.magenta} />
+                        </View>
+                    ) : (
+                        topStocks.map((stock) => {
+                            const formatted = formatCompanyForDisplay(stock);
+                            return (
+                                <StockItem
+                                    key={stock.id}
+                                    logoUrl={formatted.logoUrl}
+                                    name={formatted.name}
+                                    shortName={formatted.shortName}
+                                    onPress={() => navigation.navigate('CompanyInfo', {
+                                        name: formatted.name,
+                                        shortName: formatted.shortName,
+                                        logoUrl: formatted.logoUrl,
+                                        id: stock.id,
+                                    })}
+                                />
+                            );
+                        })
+                    )}
                 </ScrollView>
             </View>
 
@@ -95,21 +164,29 @@ const SearchScreen = () => {
                 <View style={styles.resultsSection}>
                     <Text style={styles.resultsTitle}>
                         {searchQuery.length > 0
-                            ? filteredStocks.length > 0
-                                ? `Found ${filteredStocks.length} result${filteredStocks.length > 1 ? 's' : ''}`
-                                : 'No results found'
-                            : 'Recommended Stocks'}
+                            ? searchLoading
+                                ? 'Searching...'
+                                : searchResults.length > 0
+                                    ? `Found ${searchResults.length} result${searchResults.length > 1 ? 's' : ''}`
+                                    : 'No results found'
+                            : 'Top Companies'}
                     </Text>
                     
-                    {displayStocks.length > 0 ? (
-                        displayStocks.map((stock, index) => (
+                    {searchLoading ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="large" color={theme.accent.magenta} />
+                            <Text style={styles.loadingText}>Searching...</Text>
+                        </View>
+                    ) : displayStocks.length > 0 ? (
+                        displayStocks.map((stock) => (
                             <TouchableOpacity
-                                key={index}
+                                key={stock.id}
                                 style={styles.resultCard}
                                 onPress={() => navigation.navigate('CompanyInfo', {
                                     name: stock.name,
                                     shortName: stock.shortName,
-                                    img: stock.img,
+                                    logoUrl: stock.logoUrl,
+                                    id: stock.id,
                                 })}
                             >
                                 <View style={styles.resultLeft}>
@@ -119,22 +196,17 @@ const SearchScreen = () => {
                                         <Text style={styles.resultTicker}>{stock.shortName}</Text>
                                     </View>
                                 </View>
-                                <View style={styles.resultRight}>
-                                    <Text style={styles.resultPrice}>${stock.price.toFixed(2)}</Text>
-                                    <Text style={[
-                                        styles.resultChange,
-                                        stock.change >= 0 ? styles.changePositive : styles.changeNegative
-                                    ]}>
-                                        {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)} ({stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%)
-                                    </Text>
-                                </View>
                             </TouchableOpacity>
                         ))
                     ) : (
                         <View style={styles.emptyState}>
                             <Text style={styles.emptyIcon}>🔍</Text>
                             <Text style={styles.emptyText}>No stocks found</Text>
-                            <Text style={styles.emptySubtext}>Try searching with a different term</Text>
+                            <Text style={styles.emptySubtext}>
+                                {searchQuery.length > 0 
+                                    ? 'Try searching with a different term' 
+                                    : 'Loading companies...'}
+                            </Text>
                         </View>
                     )}
                 </View>
@@ -311,6 +383,17 @@ const styles = StyleSheet.create({
         fontSize: fontSizes.body,
         fontWeight: 'bold',
         color: theme.accent.magenta,
+        fontFamily: 'ZalandoSansExpanded-Italic',
+    },
+    loadingContainer: {
+        padding: spacing.xxl,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingText: {
+        marginTop: spacing.md,
+        fontSize: fontSizes.body,
+        color: theme.text.secondary,
         fontFamily: 'ZalandoSansExpanded-Italic',
     },
 });

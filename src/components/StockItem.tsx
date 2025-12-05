@@ -4,23 +4,35 @@ import theme from "../constants/colors";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "../navigation/stackNavigation/MainNavigation";
+import { getCompanyImage } from "../utils/companyImage";
 
 type StockItemNavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
-const StockItem = ({img, name, shortName, onPress}: {img: any, name: string, shortName: string, onPress?: () => void}) => {
+interface StockItemProps {
+    img?: any;
+    logoUrl?: string | null;
+    name: string;
+    shortName: string;
+    onPress?: () => void;
+}
+
+const StockItem = ({img, logoUrl, name, shortName, onPress}: StockItemProps) => {
     const navigation = useNavigation<StockItemNavigationProp>();
+    
+    // Используем logoUrl если есть, иначе img, иначе дефолтное изображение
+    const imageSource = logoUrl ? getCompanyImage(logoUrl) : (img || getCompanyImage());
 
     const handlePress = () => {
         if (onPress) {
             onPress();
         } else {
-            navigation.navigate('CompanyInfo', { name, shortName, img });
+            navigation.navigate('CompanyInfo', { name, shortName, img: imageSource });
         }
     };
 
     return (
         <TouchableOpacity style={styles.container} onPress={handlePress}>
-            <Image source={img} style={styles.image} resizeMode="contain"/>
+            <Image source={imageSource} style={styles.image} resizeMode="contain"/>
             <View style={styles.nameContainer}>
                 <Text style={styles.name}>{name}</Text>
                 <Text style={styles.shortName}>{shortName}</Text>
