@@ -6,7 +6,7 @@ import { MainStackParamList } from "../../navigation/stackNavigation/MainNavigat
 import theme from "../../constants/colors";
 import { fontSizes, spacing, sizes } from "../../utils/fontSizes";
 import StockItem from "../../components/StockItem";
-import { searchCompaniesApi, getAllCompaniesApi } from "../../api/companyApi";
+import { searchCompaniesApi, getTopCompaniesApi } from "../../api/companyApi";
 import { getCompanyImage } from "../../utils/companyImage";
 
 type SearchScreenNavigationProp = NativeStackNavigationProp<MainStackParamList>;
@@ -31,12 +31,12 @@ const SearchScreen = () => {
     const [searchLoading, setSearchLoading] = useState(false);
     const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Загружаем топ компании при монтировании
+   
     useEffect(() => {
         const loadTopCompanies = async () => {
             try {
                 setLoading(true);
-                const response = await getAllCompaniesApi(1, 10);
+                const response = await getTopCompaniesApi();
                 // API возвращает { data: [...], pagination: {...} }
                 const companies = response.data || response || [];
                 setTopStocks(companies);
@@ -68,7 +68,7 @@ const SearchScreen = () => {
         searchTimeoutRef.current = setTimeout(async () => {
             try {
                 setSearchLoading(true);
-                const response = await searchCompaniesApi(searchQuery.trim(), 1, 20);
+                const response = await searchCompaniesApi(searchQuery.trim(), 1, 10);
                 // API возвращает { data: [...], pagination: {...} }
                 const companies = response.data || response || [];
                 setSearchResults(companies);
@@ -101,10 +101,7 @@ const SearchScreen = () => {
         };
     };
 
-    // Определяем какие акции показывать
-    const displayStocks = searchQuery.length > 0 
-        ? searchResults.map(formatCompanyForDisplay)
-        : topStocks.map(formatCompanyForDisplay);
+    const displayStocks = searchResults.map(formatCompanyForDisplay)
 
     return (
         <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
@@ -124,15 +121,8 @@ const SearchScreen = () => {
                             return (
                                 <StockItem
                                     key={stock.id}
-                                    logoUrl={formatted.logoUrl}
-                                    name={formatted.name}
-                                    shortName={formatted.shortName}
-                                    onPress={() => navigation.navigate('CompanyInfo', {
-                                        name: formatted.name,
-                                        shortName: formatted.shortName,
-                                        logoUrl: formatted.logoUrl,
-                                        id: stock.id,
-                                    })}
+                                    stockData={stock}
+                                    onPress={() => navigation.navigate('CompanyInfo', {stock})}
                                 />
                             );
                         })
@@ -163,13 +153,13 @@ const SearchScreen = () => {
 
                 <View style={styles.resultsSection}>
                     <Text style={styles.resultsTitle}>
-                        {searchQuery.length > 0
-                            ? searchLoading
+                        {
+                             searchLoading
                                 ? 'Searching...'
                                 : searchResults.length > 0
                                     ? `Found ${searchResults.length} result${searchResults.length > 1 ? 's' : ''}`
                                     : 'No results found'
-                            : 'Top Companies'}
+                        }
                     </Text>
                     
                     {searchLoading ? (
@@ -182,19 +172,14 @@ const SearchScreen = () => {
                             <TouchableOpacity
                                 key={stock.id}
                                 style={styles.resultCard}
-                                onPress={() => navigation.navigate('CompanyInfo', {
-                                    name: stock.name,
-                                    shortName: stock.shortName,
-                                    logoUrl: stock.logoUrl,
-                                    id: stock.id,
-                                })}
+                                onPress={() => navigation.navigate('CompanyInfo', {stock})}
                             >
                                 <View style={styles.resultLeft}>
-                                    <Image source={stock.img} style={styles.resultLogo} resizeMode="contain" />
                                     <View style={styles.resultInfo}>
                                         <Text style={styles.resultName}>{stock.name}</Text>
                                         <Text style={styles.resultTicker}>{stock.shortName}</Text>
                                     </View>
+                                     
                                 </View>
                             </TouchableOpacity>
                         ))
