@@ -37,8 +37,7 @@ const LoginScreen = () => {
                 // Сохраняем токен и профиль пользователя в контекст
                 // response может содержать user или мы используем данные из response
                 const userData = response.user || { email, id: response.id };
-                console.log('userData: ', userData);
-                console.log('response.access_token: ', response.access_token);
+         
                 await login(userData, response.access_token);
                 // Navigation will be handled by AppContent based on token
             }

@@ -12,8 +12,8 @@ export const AuthProvider = ({ children }) => {
   const fetchUser = async () => {
     try {
       const profile = await getMeApi();
-      setUser(profile);
-      return profile;
+      setUser(profile.user);
+      return profile.user;
     } catch (error) {
       console.error('Error fetching user profile:', error);
       if (error.response?.status === 401) {

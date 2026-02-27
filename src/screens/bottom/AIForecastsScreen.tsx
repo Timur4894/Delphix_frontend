@@ -1,15 +1,46 @@
-import React from "react";
-import { Text, View, TouchableOpacity, StyleSheet, ScrollView, Image } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import React, { useCallback, useState } from "react";
+import { Text, View, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator, Linking } from "react-native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "../../navigation/stackNavigation/MainNavigation";
 import theme from "../../constants/colors";
 import { fontSizes, spacing, sizes } from "../../utils/fontSizes";
+import { getAllNewsApi } from "../../api/newsApi";
 
 type AIForecastsScreenNavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
 const AIForecastsScreen = () => {
     const navigation = useNavigation<AIForecastsScreenNavigationProp>();
+    const [portfolioNewsLoading, setPortfolioNewsLoading] = useState(true);
+    const [portfolioNews, setPortfolioNews] = useState<any[]>([]);
+
+    const loadPortfolioNews = useCallback(async () => {
+        try {
+            setPortfolioNewsLoading(true);
+            const res = await getAllNewsApi();
+     
+            const items = Array.isArray(res) ? res : (res?.items || res?.data || []);
+            setPortfolioNews(Array.isArray(items) ? items : []);
+        } catch (error) {
+            console.error('Error loading portfolio news:', error);
+            setPortfolioNews([]);
+        } finally {
+            setPortfolioNewsLoading(false);
+        }
+    }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadPortfolioNews();
+        }, [loadPortfolioNews])
+    );
+
+    const formatFinnhubDatetime = (dt: any) => {
+        const seconds = Number(dt);
+        if (!Number.isFinite(seconds) || seconds <= 0) return '';
+        const date = new Date(seconds * 1000);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
 
     // Mock data - персональные рекомендации на основе портфеля
     const personalRecommendations = [
@@ -41,30 +72,7 @@ const AIForecastsScreen = () => {
 
     // Mock data - общие рекомендации по новостям
     const marketNews = [
-        {
-            id: 1,
-            title: "Tech Sector Rally Expected",
-            description: "Recent AI developments and strong earnings reports suggest a potential rally in tech stocks over the next quarter.",
-            impact: "Positive",
-            affectedStocks: ["AAPL", "MSFT", "GOOGL"],
-            date: "2 hours ago",
-        },
-        {
-            id: 2,
-            title: "Federal Reserve Policy Update",
-            description: "Interest rate decisions may cause market volatility. AI predicts defensive positioning in utilities and consumer staples.",
-            impact: "Neutral",
-            affectedStocks: ["Market-wide"],
-            date: "5 hours ago",
-        },
-        {
-            id: 3,
-            title: "Energy Sector Momentum",
-            description: "Oil prices and renewable energy investments are creating opportunities in energy stocks. AI forecasts 15-20% potential gains.",
-            impact: "Positive",
-            affectedStocks: ["Energy sector"],
-            date: "1 day ago",
-        },
+
     ];
 
     return (
@@ -79,8 +87,53 @@ const AIForecastsScreen = () => {
 
             <View style={styles.content}>
                 {/* Header */}
-                <Text style={styles.headerTitle}>AI Forecasts</Text>
-                <Text style={styles.headerSubtitle}>Personalized insights based on your portfolio</Text>
+        
+                {/* Portfolio News */}
+                <Text style={styles.sectionTitle}>Portfolio News</Text>
+                <Text style={styles.sectionDescription}>
+                    Latest headlines from your portfolio (last 3 days)
+                </Text>
+
+                {portfolioNewsLoading ? (
+                    <View style={styles.loadingInline}>
+                        <ActivityIndicator size="small" color={theme.accent.magenta} />
+                    </View>
+                ) : portfolioNews.length === 0 ? (
+                    <View style={styles.emptyInline}>
+                        <Text style={styles.emptyInlineText}>No news found</Text>
+                    </View>
+                ) : (
+                    portfolioNews.slice(0, 6).map((item, id) => (
+                        <TouchableOpacity
+                            key={id}
+                            style={styles.portfolioNewsItem}
+                            onPress={() => {
+                                const url = item?.url;
+                                if (typeof url === 'string' && url.startsWith('http')) {
+                                    Linking.openURL(url);
+                                }
+                            }}
+                            activeOpacity={0.85}
+                        >
+                            <View style={styles.portfolioNewsHeader}>
+                                <Text style={styles.portfolioNewsTicker}>
+                                    {item?.ticker || item?.related || '—'}
+                                </Text>
+                                <Text style={styles.portfolioNewsDate}>
+                                    {formatFinnhubDatetime(item?.datetime)}
+                                </Text>
+                            </View>
+                            <Text style={styles.portfolioNewsTitle} numberOfLines={2}>
+                                {item?.headline || item?.title || 'Untitled'}
+                            </Text>
+                            {(item?.source || item?.category) && (
+                                <Text style={styles.portfolioNewsMeta} numberOfLines={1}>
+                                    {item?.source || item?.category}
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+                    ))
+                )}
 
                 {/* Personal Recommendations */}
                 <Text style={styles.sectionTitle}>Personal Recommendations</Text>
@@ -88,9 +141,9 @@ const AIForecastsScreen = () => {
                     AI analysis based on your current portfolio and latest market news
                 </Text>
 
-                {personalRecommendations.map((rec) => (
+                {personalRecommendations.map((rec, id) => (
                     <TouchableOpacity
-                        key={rec.id}
+                        key={id}
                         style={styles.recommendationCard}
                         onPress={() => navigation.navigate('CompanyInfo', {
                             name: rec.stock.name,
@@ -100,7 +153,7 @@ const AIForecastsScreen = () => {
                     >
                         <View style={styles.recommendationHeader}>
                             <View style={styles.recommendationLeft}>
-                                <Image source={rec.stock.img} style={styles.stockLogo} resizeMode="contain" />
+                                {/* <Image source={rec.stock.img} style={styles.stockLogo} resizeMode="contain" /> */}
                                 <View style={styles.stockInfo}>
                                     <Text style={styles.stockName}>{rec.stock.name}</Text>
                                     <Text style={styles.stockTicker}>{rec.stock.shortName}</Text>
@@ -127,36 +180,8 @@ const AIForecastsScreen = () => {
                     </TouchableOpacity>
                 ))}
 
-                {/* Market News & Analysis */}
-                <Text style={styles.sectionTitle}>Market Analysis</Text>
-                <Text style={styles.sectionDescription}>
-                    Latest news and AI predictions on market impact
-                </Text>
 
-                {marketNews.map((news) => (
-                    <View key={news.id} style={styles.newsCard}>
-                        <View style={styles.newsHeader}>
-                            <Text style={styles.newsTitle}>{news.title}</Text>
-                            <View style={[
-                                styles.impactBadge,
-                                news.impact === 'Positive' ? styles.positiveBadge :
-                                news.impact === 'Negative' ? styles.negativeBadge : styles.neutralBadge
-                            ]}>
-                                <Text style={styles.impactBadgeText}>{news.impact}</Text>
-                            </View>
-                        </View>
-                        <Text style={styles.newsDescription}>{news.description}</Text>
-                        <View style={styles.newsFooter}>
-                            <View style={styles.affectedStocks}>
-                                <Text style={styles.affectedLabel}>Affected:</Text>
-                                <Text style={styles.affectedStocksText}>
-                                    {news.affectedStocks.join(', ')}
-                                </Text>
-                            </View>
-                            <Text style={styles.newsDate}>{news.date}</Text>
-                        </View>
-                    </View>
-                ))}
+                
             </View>
         </ScrollView>
     );
@@ -222,6 +247,56 @@ const styles = StyleSheet.create({
         color: theme.text.muted,
         fontFamily: 'ZalandoSansExpanded-Italic',
         marginBottom: spacing.lg,
+    },
+    loadingInline: {
+        paddingVertical: spacing.lg,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyInline: {
+        paddingVertical: spacing.lg,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyInlineText: {
+        fontSize: fontSizes.bodySmall,
+        color: theme.text.muted,
+        fontFamily: 'ZalandoSansExpanded-Italic',
+    },
+    portfolioNewsItem: {
+        backgroundColor: theme.background.secondary,
+        borderRadius: sizes.cardBorderRadius,
+        padding: sizes.cardPaddingLarge,
+        marginBottom: spacing.md,
+    },
+    portfolioNewsHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.sm,
+    },
+    portfolioNewsTicker: {
+        fontSize: fontSizes.caption,
+        color: theme.accent.magenta,
+        fontFamily: 'ZalandoSansExpanded-Italic',
+        fontWeight: '700',
+    },
+    portfolioNewsDate: {
+        fontSize: fontSizes.caption,
+        color: theme.text.muted,
+        fontFamily: 'ZalandoSansExpanded-Italic',
+    },
+    portfolioNewsTitle: {
+        fontSize: fontSizes.body,
+        fontWeight: 'bold',
+        color: theme.text.primary,
+        fontFamily: 'ZalandoSansExpanded-Italic',
+        marginBottom: spacing.xs,
+    },
+    portfolioNewsMeta: {
+        fontSize: fontSizes.caption,
+        color: theme.text.secondary,
+        fontFamily: 'ZalandoSansExpanded-Italic',
     },
     recommendationCard: {
         backgroundColor: theme.background.secondary,

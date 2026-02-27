@@ -24,4 +24,10 @@ export const getCompanyTransactionsApi = async (ticker) => {
     return response.data;
 };
 
+// Remove holding from portfolio by ticker
+export const deleteHoldingByTickerApi = async (ticker) => {
+    const response = await indexApi.delete(`/portfolio-companies/ticker/${ticker}`);
+    return response.data;
+};
+
 

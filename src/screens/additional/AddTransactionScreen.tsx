@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, Alert } from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "../../navigation/stackNavigation/MainNavigation";
@@ -11,6 +11,7 @@ import BackSvg from "../../assets/svg/BackSvg";
 import Header from "../../components/Header";
 import { getCompanyImage } from "../../utils/companyImage";
 import { searchCompaniesApi } from "../../api/companyApi";
+import { createTransactionByTickerApi } from "../../api/transactionApi";
 
 type AddTransactionScreenNavigationProp = NativeStackNavigationProp<MainStackParamList, 'AddTransaction'>;
 type AddTransactionScreenRouteProp = RouteProp<MainStackParamList, 'AddTransaction'>;
@@ -21,8 +22,8 @@ const AddTransactionScreen = () => {
     const [transactionType, setTransactionType] = useState<'buy' | 'sell'>('buy');
     const [selectedStock, setSelectedStock] = useState<{name: string, shortName: string, img: any, logoUrl?: string | null} | null>(null);
     const [quantity, setQuantity] = useState("");
-    const [price, setPrice] = useState("");
     const [note, setNote] = useState("");
+    const [submitting, setSubmitting] = useState(false);
 
     // Устанавливаем выбранную компанию из параметров навигации и загружаем актуальную цену
     useEffect(() => {
@@ -39,36 +40,45 @@ const AddTransactionScreen = () => {
                     logoUrl: route.params.logoUrl,
                 };
                 setSelectedStock(stockFromParams);
-
-                // Загружаем актуальную цену компании
-                try {
-                    const searchResult = await searchCompaniesApi(route.params.shortName, 1, 1);
-                    const companies = searchResult.data || searchResult || [];
-                    const company = companies.find((c: any) => c.ticker === route.params.shortName) || companies[0];
-                    
-                    if (company && company.current_price) {
-                        // Автозаполняем цену актуальной ценой из API
-                        setPrice(company.current_price.toString());
-                    }
-                } catch (error) {
-                    console.error('Error loading company price:', error);
-                }
             }
         };
 
         loadCompanyData();
     }, [route.params]);
 
-    const handleSubmit = () => {
-        // TODO: Implement transaction submission
-        console.log({
-            type: transactionType,
-            stock: selectedStock,
-            quantity,
-            price,
-            note,
-        });
-        navigation.goBack();
+    const handleSubmit = async () => {
+        if (submitting) return;
+        if (!selectedStock?.shortName) {
+            Alert.alert('Error', 'No company selected');
+            return;
+        }
+
+        const qty = Number(quantity);
+        if (!Number.isFinite(qty) || qty <= 0) {
+            Alert.alert('Error', 'Please enter a valid quantity');
+            return;
+        }
+
+        const payload = {
+            type: transactionType === 'buy' ? 'BUY' : 'SELL',
+            quantity: qty,
+            notes: note?.trim() ? note.trim() : undefined,
+        };
+
+        try {
+            setSubmitting(true);
+            await createTransactionByTickerApi(selectedStock.shortName, payload);
+            navigation.goBack();
+        } catch (error: any) {
+            console.error('Error creating transaction:', error);
+            const message =
+                error?.response?.data?.message ||
+                error?.message ||
+                'Failed to create transaction';
+            Alert.alert('Error', String(message));
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     return (
@@ -126,30 +136,6 @@ const AddTransactionScreen = () => {
                         keyboardType="numeric"
                     />
                 </View>
-
-                {/* Price Input */}
-                <Text style={styles.sectionTitle}>Price per Share</Text>
-                <View style={styles.inputContainer}>
-                    <Text style={styles.inputIcon}>💰</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Enter price per share"
-                        placeholderTextColor={theme.text.placeholder}
-                        value={price}
-                        onChangeText={setPrice}
-                        keyboardType="decimal-pad"
-                    />
-                </View>
-
-                {/* Total Calculation */}
-                {quantity && price && (
-                    <View style={styles.totalContainer}>
-                        <Text style={styles.totalLabel}>Total Amount</Text>
-                        <Text style={styles.totalValue}>
-                            ${(parseFloat(quantity) * parseFloat(price)).toFixed(2)}
-                        </Text>
-                    </View>
-                )}
 
                 {/* Note Input */}
                 <Text style={styles.sectionTitle}>Note (Optional)</Text>

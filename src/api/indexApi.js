@@ -13,6 +13,7 @@ export const indexApi = axios.create({
 indexApi.interceptors.request.use(
     async (config) => {
         const token = await tokenStorage.getToken();
+        // console.log(token)
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }

@@ -29,10 +29,10 @@ const EditProfileScreen = () => {
     const route = useRoute<EditProfileScreenRouteProp>();
     const { user, fetchUser } = useContext(AuthContext);
     
-    const [userName, setUserName] = useState(user?.user?.user_name || "");
-    const [email, setEmail] = useState(user?.user?.email || "");
-    const [avatar, setAvatar] = useState(user?.user?.avatar || null);
-    const [avatarUri, setAvatarUri] = useState<string | null>(user?.user?.avatar || null);
+    const [userName, setUserName] = useState(user?.user_name || "");
+    const [email, setEmail] = useState(user?.email || "");
+    const [avatar, setAvatar] = useState(user?.avatar || null);
+    const [avatarUri, setAvatarUri] = useState<string | null>(user?.avatar || null);
     const [loading, setLoading] = useState(false);
 
     const handlePickImage = () => {
@@ -136,7 +136,7 @@ const EditProfileScreen = () => {
 
             <View style={styles.content}>
                 {/* Avatar Section */}
-                <View style={styles.avatarSection}>
+                {/* <View style={styles.avatarSection}>
                     <View style={styles.avatarContainer}>
                         {avatarUri ? (
                             <Image source={{ uri: avatarUri }} style={styles.avatar} />
@@ -151,7 +151,7 @@ const EditProfileScreen = () => {
                     <TouchableOpacity style={styles.changeAvatarButton} onPress={handlePickImage}>
                         <Text style={styles.changeAvatarText}>Change Photo</Text>
                     </TouchableOpacity>
-                </View>
+                </View> */}
 
                 {/* Name Input */}
                 <Text style={styles.sectionTitle}>Name</Text>

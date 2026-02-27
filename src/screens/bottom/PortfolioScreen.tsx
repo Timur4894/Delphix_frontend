@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ImageBackground, ActivityIndicator } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import React, { useState, useCallback, useContext } from "react";
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ImageBackground, ActivityIndicator, Alert } from "react-native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "../../navigation/stackNavigation/MainNavigation";
 import Header from "../../components/Header";
 import theme from "../../constants/colors";
 import { fontSizes, spacing, sizes } from "../../utils/fontSizes";
 import GradientBtn from "../../components/GradientBtn";
-import { getMyPortfolioApi } from "../../api/portfolioApi";
+import { getMyPortfolioApi, deleteHoldingByTickerApi } from "../../api/portfolioApi";
 import { getCompanyImage } from "../../utils/companyImage";
+import { AuthContext } from "../../context/AuthContext";
 
 type MyPortfolioScreenNavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -25,40 +26,53 @@ const PortfolioScreen = () => {
         totalProfitPercent: 0,
     });
 
-    // Загружаем портфель из API
-    useEffect(() => {
-        const loadPortfolio = async () => {
-            try {
-                setLoading(true);
-                const response = await getMyPortfolioApi();
-                const portfolioItems = Array.isArray(response) ? response : (response.data || []);
-                setPortfolio(portfolioItems);
+    const loadPortfolio = useCallback(async () => {
+        try {
+            setLoading(true);
+            const response = await getMyPortfolioApi();
+            const portfolioItems = Array.isArray(response) ? response : (response.data || []);
+            console.log('PortfolioScreen: portfolioItems from API:', portfolioItems);
+            setPortfolio(portfolioItems);
 
-                // Рассчитываем общую статистику
-                if (portfolioItems.length > 0) {
-                    const totalValue = portfolioItems.reduce((sum, item) => sum + (item.current_value || 0), 0);
-                    const totalCost = portfolioItems.reduce((sum, item) => sum + (item.total_invested || 0), 0);
-                    const totalProfit = totalValue - totalCost;
-                    const totalProfitPercent = totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
+            const totalValue = portfolioItems.reduce(
+                (sum: number, item: any) => sum + (item.current_value || 0),
+                0
+            );
+            const totalCost = portfolioItems.reduce(
+                (sum: number, item: any) => sum + (item.total_invested || 0),
+                0
+            );
+            const totalProfit = totalValue - totalCost;
+            const totalProfitPercent = totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
 
-                    setPortfolioData({
-                        totalValue,
-                        totalChange: 0, // Можно рассчитать из price_change
-                        totalChangePercent: 0,
-                        totalCost,
-                        totalProfit,
-                        totalProfitPercent,
-                    });
-                }
-            } catch (error) {
-                console.error('Error loading portfolio:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
+            console.log('PortfolioScreen totals:', {
+                totalValue,
+                totalCost,
+                totalProfit,
+                totalProfitPercent,
+            });
 
-        loadPortfolio();
+            setPortfolioData({
+                totalValue,
+                totalChange: totalProfit,
+                totalChangePercent: totalProfitPercent,
+                totalCost,
+                totalProfit,
+                totalProfitPercent,
+            });
+        } catch (error) {
+            console.error('Error loading portfolio:', error);
+        } finally {
+            setLoading(false);
+        }
     }, []);
+
+    // Рефетчим портфель каждый раз при возврате на экран
+    useFocusEffect(
+        useCallback(() => {
+            loadPortfolio();
+        }, [loadPortfolio])
+    );
 
     // Форматируем данные портфеля для отображения
     const formatHolding = (item: any) => {
@@ -85,6 +99,33 @@ const PortfolioScreen = () => {
         { label: "Holdings", value: holdings.length.toString() },
     ];
 
+    const handleRemoveHolding = (ticker: string) => {
+        Alert.alert(
+            'Remove holding',
+            `Remove ${ticker} from your portfolio? This does not delete your transaction history.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Remove',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await deleteHoldingByTickerApi(ticker);
+                            await loadPortfolio();
+                        } catch (error: any) {
+                            console.error('Error removing holding:', error);
+                            const message =
+                                error?.response?.data?.message ||
+                                error?.message ||
+                                'Failed to remove holding';
+                            Alert.alert('Error', String(message));
+                        }
+                    },
+                },
+            ],
+        );
+    };
+
     return (
         <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
             <Text style={{paddingHorizontal: 20,paddingTop: 80, fontSize: fontSizes.h4, fontWeight: 'bold', color: theme.text.primary, fontFamily: 'ZalandoSansExpanded-Italic', marginBottom: 20}}>My Portfolio</Text>
@@ -101,10 +142,13 @@ const PortfolioScreen = () => {
                         <Text style={styles.summaryLabel}>Total Portfolio Value</Text>
                         <Text style={styles.summaryValue}>${portfolioData.totalValue.toFixed(2)}</Text>
                         <View style={styles.changeRow}>
-                            <Text style={styles.changeText}>
-                                +${portfolioData.totalChange.toFixed(2)} (+{portfolioData.totalChangePercent.toFixed(2)}%)
+                            <Text style={[
+                                styles.changeText,
+                                portfolioData.totalChange >= 0 ? styles.profitPositive : styles.profitNegative
+                            ]}>
+                                {portfolioData.totalChange >= 0 ? '+' : ''}${portfolioData.totalChange.toFixed(2)} ({portfolioData.totalChangePercent >= 0 ? '+' : ''}{portfolioData.totalChangePercent.toFixed(2)}%)
                             </Text>
-                            <Text style={styles.timeText}>Last 12h</Text>
+                            {/* <Text style={styles.timeText}>Overall Profit/Loss</Text> */}
                         </View>
                     </View>
                 </ImageBackground>
@@ -132,47 +176,52 @@ const PortfolioScreen = () => {
                     </View>
                 ) : holdings.length > 0 ? (
                     holdings.map((holding) => (
-                    <TouchableOpacity
-                        key={holding.id}
-                        style={styles.holdingCard}
-                        onPress={() => navigation.navigate('CompanyInfo', {
-                            name: holding.name,
-                            shortName: holding.shortName,
-                            logoUrl: holding.logoUrl,
-                            id: holding.id,
-                        })}
-                    >
-                        <View style={styles.holdingHeader}>
-                            <Image source={getCompanyImage(holding.logoUrl)} style={styles.holdingLogo} resizeMode="contain" />
-                            <View style={styles.holdingInfo}>
-                                <Text style={styles.holdingName}>{holding.name}</Text>
-                                <Text style={styles.holdingTicker}>{holding.shortName}</Text>
-                            </View>
-                            <View style={styles.holdingPrice}>
-                                <Text style={styles.currentPrice}>${holding.currentPrice.toFixed(2)}</Text>
-                                <Text style={[
-                                    styles.profitText,
-                                    holding.profit >= 0 ? styles.profitPositive : styles.profitNegative
-                                ]}>
-                                    {holding.profit >= 0 ? '+' : ''}${holding.profit.toFixed(2)} ({holding.profitPercent >= 0 ? '+' : ''}{holding.profitPercent.toFixed(2)}%)
-                                </Text>
+                        <View key={holding.id} style={styles.holdingCard}>
+                            <TouchableOpacity
+                                onPress={() => navigation.navigate('CompanyInfo', {
+                                    name: holding.name,
+                                    shortName: holding.shortName,
+                                    logoUrl: holding.logoUrl,
+                                    id: holding.id,
+                                })}
+                            >
+                                <View style={styles.holdingHeader}>
+                                    {/* <Image source={getCompanyImage(holding.logoUrl)} style={styles.holdingLogo} resizeMode="contain" /> */}
+                                    <View style={styles.holdingInfo}>
+                                        <Text style={styles.holdingName}>{holding.name}</Text>
+                                        <Text style={styles.holdingTicker}>{holding.shortName}</Text>
+                                    </View>
+                                    <View style={styles.holdingPrice}>
+                                        <Text style={styles.currentPrice}>${holding.currentPrice.toFixed(2)}</Text>
+                                        <Text style={[
+                                            styles.profitText,
+                                            holding.profit >= 0 ? styles.profitPositive : styles.profitNegative
+                                        ]}>
+                                            {holding.profit >= 0 ? '+' : ''}${holding.profit.toFixed(2)} ({holding.profitPercent >= 0 ? '+' : ''}{holding.profitPercent.toFixed(2)}%)
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={styles.holdingDetails}>
+                                    <View style={styles.detailRow}>
+                                        <Text style={styles.detailLabel}>Quantity:</Text>
+                                        <Text style={styles.detailValue}>{holding.quantity} shares</Text>
+                                    </View>
+                                    <View style={styles.detailRow}>
+                                        <Text style={styles.detailLabel}>Avg Price:</Text>
+                                        <Text style={styles.detailValue}>${holding.avgPrice.toFixed(2)}</Text>
+                                    </View>
+                                    <View style={styles.detailRow}>
+                                        <Text style={styles.detailLabel}>Value:</Text>
+                                        <Text style={styles.detailValue}>${holding.value.toFixed(2)}</Text>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+                            <View style={styles.holdingActions}>
+                                <TouchableOpacity onPress={() => handleRemoveHolding(holding.shortName)}>
+                                    <Text style={styles.removeHoldingText}>Remove from portfolio</Text>
+                                </TouchableOpacity>
                             </View>
                         </View>
-                        <View style={styles.holdingDetails}>
-                            <View style={styles.detailRow}>
-                                <Text style={styles.detailLabel}>Quantity:</Text>
-                                <Text style={styles.detailValue}>{holding.quantity} shares</Text>
-                            </View>
-                            <View style={styles.detailRow}>
-                                <Text style={styles.detailLabel}>Avg Price:</Text>
-                                <Text style={styles.detailValue}>${holding.avgPrice.toFixed(2)}</Text>
-                            </View>
-                            <View style={styles.detailRow}>
-                                <Text style={styles.detailLabel}>Value:</Text>
-                                <Text style={styles.detailValue}>${holding.value.toFixed(2)}</Text>
-                            </View>
-                        </View>
-                    </TouchableOpacity>
                     ))
                 ) : (
                     <View style={styles.emptyState}>
@@ -349,6 +398,16 @@ const styles = StyleSheet.create({
         borderTopColor: theme.border.default,
         paddingTop: spacing.md,
         gap: spacing.sm,
+    },
+    holdingActions: {
+        marginTop: spacing.sm,
+        alignItems: 'flex-end',
+    },
+    removeHoldingText: {
+        fontSize: fontSizes.caption,
+        color: theme.text.muted,
+        fontFamily: 'ZalandoSansExpanded-Italic',
+        textDecorationLine: 'underline',
     },
     detailRow: {
         flexDirection: 'row',

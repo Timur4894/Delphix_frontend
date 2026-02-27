@@ -40,6 +40,7 @@ export const searchCompaniesApi = async (q, page = 1, limit = 10) => {
         try {
         const response = await indexApi.get("/company/by-ticker", {
             params: { ticker },
+            
         });
         return response.data; 
         } catch (error) {

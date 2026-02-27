@@ -1,109 +1,54 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import React, { useCallback, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "../../navigation/stackNavigation/MainNavigation";
 import Header from "../../components/Header";
 import theme from "../../constants/colors";
 import { fontSizes, spacing, sizes } from "../../utils/fontSizes";
+import { getAllMyTransactionsApi } from "../../api/transactionApi";
+import { getCompanyImage } from "../../utils/companyImage";
 
 type TransactionHistoryScreenNavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
 type TransactionType = 'all' | 'buy' | 'sell';
 
 const TransactionHistoryScreen = () => {
-    const navigation = useNavigation<TransactionHistoryScreenNavigationProp>();
     const [filter, setFilter] = useState<TransactionType>('all');
+    const [transactions, setTransactions] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    // Mock data - в реальном приложении это будет приходить с API
-    const transactions = [
-        {
-            id: 1,
-            type: 'buy' as const,
-            name: "Apple",
-            shortName: "AAPL",
-            img: require('../../assets/img/appleLogo.png'),
-            quantity: 10,
-            price: 175.50,
-            total: 1755.00,
-            date: "2024-01-15",
-            time: "14:30",
-            note: "Bought at market price",
-        },
-        {
-            id: 2,
-            type: 'sell' as const,
-            name: "Tesla",
-            shortName: "TSLA",
-            img: require('../../assets/img/logo.jpg'),
-            quantity: 5,
-            price: 245.30,
-            total: 1226.50,
-            date: "2024-01-14",
-            time: "10:15",
-            note: "",
-        },
-        {
-            id: 3,
-            type: 'buy' as const,
-            name: "Microsoft",
-            shortName: "MSFT",
-            img: require('../../assets/img/appleLogo.png'),
-            quantity: 8,
-            price: 380.25,
-            total: 3042.00,
-            date: "2024-01-13",
-            time: "16:45",
-            note: "Long term investment",
-        },
-        {
-            id: 4,
-            type: 'buy' as const,
-            name: "Google",
-            shortName: "GOOGL",
-            img: require('../../assets/img/appleLogo.png'),
-            quantity: 3,
-            price: 135.50,
-            total: 406.50,
-            date: "2024-01-12",
-            time: "09:20",
-            note: "",
-        },
-        {
-            id: 5,
-            type: 'sell' as const,
-            name: "Apple",
-            shortName: "AAPL",
-            img: require('../../assets/img/appleLogo.png'),
-            quantity: 2,
-            price: 178.00,
-            total: 356.00,
-            date: "2024-01-11",
-            time: "11:30",
-            note: "Profit taking",
-        },
-        {
-            id: 6,
-            type: 'buy' as const,
-            name: "Tesla",
-            shortName: "TSLA",
-            img: require('../../assets/img/logo.jpg'),
-            quantity: 3,
-            price: 240.00,
-            total: 720.00,
-            date: "2024-01-10",
-            time: "13:15",
-            note: "",
-        },
-    ];
+    const loadTransactions = useCallback(async () => {
+        try {
+            setLoading(true);
+            const data = await getAllMyTransactionsApi();
+            const items = Array.isArray(data) ? data : (data?.data || []);
+            setTransactions(items);
+        } catch (error) {
+            console.error('Error loading transactions:', error);
+            setTransactions([]);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
-    const filteredTransactions = filter === 'all' 
-        ? transactions 
-        : transactions.filter(t => t.type === filter);
+    useFocusEffect(
+        useCallback(() => {
+            loadTransactions();
+        }, [loadTransactions])
+    );
+
+    const filteredTransactions = filter === 'all'
+        ? transactions
+        : transactions.filter(t => String(t.type).toUpperCase() === filter.toUpperCase());
 
     const stats = {
-        totalBuy: transactions.filter(t => t.type === 'buy').reduce((sum, t) => sum + t.total, 0),
-        totalSell: transactions.filter(t => t.type === 'sell').reduce((sum, t) => sum + t.total, 0),
+        totalBuy: transactions
+            .filter(t => String(t.type).toUpperCase() === 'BUY')
+            .reduce((sum, t) => sum + Number(t.total_cost || 0), 0),
+        totalSell: transactions
+            .filter(t => String(t.type).toUpperCase() === 'SELL')
+            .reduce((sum, t) => sum + Number(t.total_cost || 0), 0),
         totalTransactions: transactions.length,
     };
 
@@ -162,20 +107,34 @@ const TransactionHistoryScreen = () => {
                     {filter === 'all' ? 'All Transactions' : filter === 'buy' ? 'Buy Transactions' : 'Sell Transactions'}
                 </Text>
 
-                {filteredTransactions.length === 0 ? (
+                {loading ? (
+                    <View style={styles.emptyContainer}>
+                        <ActivityIndicator size="large" color={theme.accent.magenta} />
+                    </View>
+                ) : filteredTransactions.length === 0 ? (
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyText}>No transactions found</Text>
                     </View>
                 ) : (
                     filteredTransactions.map((transaction, index) => {
-                        const showDateHeader = index === 0 || 
-                            filteredTransactions[index - 1].date !== transaction.date;
+                        const txDate = transaction.date ? new Date(transaction.date) : new Date();
+                        const dateKey = txDate.toISOString().slice(0, 10);
+                        const prev = filteredTransactions[index - 1];
+                        const prevKey = prev?.date ? new Date(prev.date).toISOString().slice(0, 10) : null;
+                        const showDateHeader = index === 0 || prevKey !== dateKey;
+                        const companyName = transaction.company?.name || transaction.company_ticker || 'Unknown';
+                        const ticker = transaction.company?.ticker || transaction.company_ticker || 'N/A';
+                        const logoUrl = transaction.company?.logo_url || null;
+                        const qty = Number(transaction.quantity || 0);
+                        const total = Number(transaction.total_cost || 0);
+                        const pps = qty > 0 ? total / qty : 0;
+                        const type = String(transaction.type).toUpperCase() === 'BUY' ? 'buy' : 'sell';
                         
                         return (
                             <View key={transaction.id}>
                                 {showDateHeader && (
                                     <Text style={styles.dateHeader}>
-                                        {formatDate(transaction.date)}
+                                        {formatDate(dateKey)}
                                     </Text>
                                 )}
                                 <View
@@ -184,18 +143,18 @@ const TransactionHistoryScreen = () => {
                                 >
                                     <View style={styles.transactionHeader}>
                                         <View style={styles.transactionLeft}>
-                                            <Image source={transaction.img} style={styles.transactionLogo} resizeMode="contain" />
+                                            {/* <Image source={getCompanyImage(logoUrl)} style={styles.transactionLogo} resizeMode="contain" /> */}
                                             <View style={styles.transactionInfo}>
-                                                <Text style={styles.transactionName}>{transaction.name}</Text>
-                                                <Text style={styles.transactionTicker}>{transaction.shortName}</Text>
+                                                <Text style={styles.transactionName}>{companyName}</Text>
+                                                <Text style={styles.transactionTicker}>{ticker}</Text>
                                             </View>
                                         </View>
                                         <View style={[
                                             styles.typeBadge,
-                                            transaction.type === 'buy' ? styles.typeBadgeBuy : styles.typeBadgeSell
+                                            type === 'buy' ? styles.typeBadgeBuy : styles.typeBadgeSell
                                         ]}>
                                             <Text style={styles.typeBadgeText}>
-                                                {transaction.type === 'buy' ? 'Buy' : 'Sell'}
+                                                {type === 'buy' ? 'Buy' : 'Sell'}
                                             </Text>
                                         </View>
                                     </View>
@@ -203,23 +162,25 @@ const TransactionHistoryScreen = () => {
                                     <View style={styles.transactionDetails}>
                                         <View style={styles.detailRow}>
                                             <Text style={styles.detailLabel}>Quantity:</Text>
-                                            <Text style={styles.detailValue}>{transaction.quantity} shares</Text>
+                                            <Text style={styles.detailValue}>{qty} shares</Text>
                                         </View>
                                         <View style={styles.detailRow}>
                                             <Text style={styles.detailLabel}>Price:</Text>
-                                            <Text style={styles.detailValue}>${transaction.price.toFixed(2)}</Text>
+                                            <Text style={styles.detailValue}>${pps.toFixed(2)}</Text>
                                         </View>
                                         <View style={styles.detailRow}>
                                             <Text style={styles.detailLabel}>Total:</Text>
-                                            <Text style={styles.detailValueTotal}>${transaction.total.toFixed(2)}</Text>
+                                            <Text style={styles.detailValueTotal}>${total.toFixed(2)}</Text>
                                         </View>
                                         <View style={styles.detailRow}>
                                             <Text style={styles.detailLabel}>Time:</Text>
-                                            <Text style={styles.detailValue}>{transaction.time}</Text>
+                                            <Text style={styles.detailValue}>
+                                                {txDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                            </Text>
                                         </View>
-                                        {transaction.note && (
+                                        {transaction.notes && (
                                             <View style={styles.noteContainer}>
-                                                <Text style={styles.noteText}>📝 {transaction.note}</Text>
+                                                <Text style={styles.noteText}>📝 {transaction.notes}</Text>
                                             </View>
                                         )}
                                     </View>

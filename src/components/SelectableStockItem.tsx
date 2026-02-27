@@ -24,7 +24,7 @@ const SelectableStockItem = ({ img, logoUrl, name, shortName, isSelected, onPres
             ]} 
             onPress={onPress}
         >
-            <Image source={imageSource} style={styles.image} resizeMode="contain" />
+            {/* <Image source={imageSource} style={styles.image} resizeMode="contain" /> */}
             <View style={styles.nameContainer}>
                 <Text style={styles.name}>{name}</Text>
                 <Text style={styles.shortName}>{shortName}</Text>

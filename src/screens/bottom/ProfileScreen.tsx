@@ -14,34 +14,41 @@ const ProfileScreen = ({navigation}: {navigation: NativeStackNavigationProp<Main
     const { logout, user } = useContext(AuthContext);
     const [portfolio, setPortfolio] = useState(null);
     const [portfolioLoading, setPortfolioLoading] = useState(true);
+    const [netWorth, setNetWorth] = useState(0);
 
     const handleEditProfile = () => {
         navigation.navigate('EditProfile');
     };
     
-    // useEffect(() => {
-    //     const loadPortfolio = async () => {
-    //         try {
-    //             setPortfolioLoading(true);
-    //             const portfolioData = await getMyPortfolioApi();
-    //             setPortfolio(portfolioData);
-                
-    //         } catch (error) {
-    //             console.error('Error loading portfolio:', error);
-    //         } finally {
-    //             setPortfolioLoading(false);
-    //         }
-    //     };
+    useEffect(() => {
+        const loadPortfolio = async () => {
+            try {
+                setPortfolioLoading(true);
+                const response = await getMyPortfolioApi();
+                const portfolioItems = Array.isArray(response) ? response : (response.data || []);
+                setPortfolio(portfolioItems);
 
-    //     if (user) {
-    //         loadPortfolio();
-    //     }
-    // }, [user]);
+                const totalValue = portfolioItems.reduce(
+                    (sum: number, item: any) => sum + (item.current_value || 0),
+                    0
+                );
+                setNetWorth(totalValue);
+            } catch (error) {
+                console.error('Error loading portfolio:', error);
+            } finally {
+                setPortfolioLoading(false);
+            }
+        };
 
+        if (user) {
+            loadPortfolio();
+        }
+    }, [user]);
+    
     const accountInfo = [
-        { label: "Email", value: user?.user.email || "N/A" },
-        { label: "Name", value: user?.user.user_name || "N/A" },
-        { label: "User ID", value: user?.user.id?.toString() || "N/A" },
+        { label: "Email", value: user?.email || "N/A" },
+        { label: "Name", value: user?.user_name || "N/A" },
+        { label: "User ID", value: user?.id?.toString() || "N/A" },
     ];
 
     const handleLogout = async () => {
@@ -69,15 +76,15 @@ const ProfileScreen = ({navigation}: {navigation: NativeStackNavigationProp<Main
             >
                 {!user?.user?.avatar && (
                     <View style={styles.avatarPlaceholder}>
-                        <Text style={styles.avatarPlaceholderText}>{user?.user?.user_name?.charAt(0) || "U"}</Text>
+                        <Text style={styles.avatarPlaceholderText}>{user?.user_name?.charAt(0) || "U"}</Text>
                     </View>
                 )}
                 <TouchableOpacity style={styles.editBtn} onPress={handleEditProfile}>
                     <EditSvg width={24} height={24} color={theme.text.primary} />
                 </TouchableOpacity>
                  <View style={styles.headerOverlay}>
-                    <Text style={styles.title}>{user?.user?.user_name || user?.user?.name || "User"}</Text>
-                    <Text style={styles.email}>{user?.user?.email || "No email"}</Text>
+                    <Text style={styles.title}>{user?.user_name || user?.name || "User"}</Text>
+                    <Text style={styles.email}>{user?.email || "No email"}</Text>
                     {/* <View style={styles.badge}>
                         <Text style={styles.badgeText}>Premium plan</Text>
                     </View> */}
@@ -89,11 +96,13 @@ const ProfileScreen = ({navigation}: {navigation: NativeStackNavigationProp<Main
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <View>
                             <Text style={styles.cardTitle}>Net worth</Text>
-                            
+                            {portfolioLoading ? (
+                                <ActivityIndicator size="small" color={theme.accent.magenta} style={{ marginTop: spacing.sm }} />
+                            ) : (
                                 <Text style={styles.cardValue}>
-                                    $0
+                                    ${netWorth.toFixed(2)}
                                 </Text>
-                    
+                            )}
                         </View>
                     </View>
                 </View>

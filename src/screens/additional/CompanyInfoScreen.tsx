@@ -15,7 +15,9 @@ type CompanyInfoScreenNavigationProp = NativeStackNavigationProp<MainStackParamL
 const CompanyInfoScreen = () => {
   const route = useRoute<CompanyInfoScreenRouteProp>();
   const navigation = useNavigation<CompanyInfoScreenNavigationProp>();
-  const { stock } = route.params;
+  const params: any = route.params || {};
+  // Screen can be opened with either `{ stock }` or direct company fields
+  const stock = params.stock ?? params;
 
   const [companyData, setCompanyData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -125,7 +127,7 @@ const CompanyInfoScreen = () => {
               name, 
               shortName, 
               img: imageSource,
-              logoUrl 
+              logoUrl
             })}
           >
             <Text style={styles.actionButtonText}>Add transaction</Text>

@@ -8,7 +8,6 @@ import theme from "../constants/colors";
 
 const AppContent = () => {
     const { user, isLoading } = useContext(AuthContext);
-    console.log('user: ', user);
     if (isLoading) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background.primary }}>
