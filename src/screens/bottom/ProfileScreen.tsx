@@ -70,20 +70,20 @@ const ProfileScreen = ({navigation}: {navigation: NativeStackNavigationProp<Main
     return (
         <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
             <ImageBackground
-                source={{uri: user?.user?.avatar}}
+                source={require('../../assets/img/gradientBG2.jpg')}
                 imageStyle={{ borderRadius: 30 }}
                 style={styles.header}
             >
                 {!user?.user?.avatar && (
                     <View style={styles.avatarPlaceholder}>
-                        <Text style={styles.avatarPlaceholderText}>{user?.user_name?.charAt(0) || "U"}</Text>
+                        <Text style={styles.avatarPlaceholderText}>{user?.user_name}</Text>
                     </View>
                 )}
                 <TouchableOpacity style={styles.editBtn} onPress={handleEditProfile}>
                     <EditSvg width={24} height={24} color={theme.text.primary} />
                 </TouchableOpacity>
                  <View style={styles.headerOverlay}>
-                    <Text style={styles.title}>{user?.user_name || user?.name || "User"}</Text>
+                 
                     <Text style={styles.email}>{user?.email || "No email"}</Text>
                     {/* <View style={styles.badge}>
                         <Text style={styles.badgeText}>Premium plan</Text>
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
         padding: spacing.md,
     },
     avatarPlaceholderText: {
-        fontSize: 80,
+        fontSize: 40,
         fontWeight: 'bold',
         color: theme.text.primary,
         fontFamily: 'ZalandoSansExpanded-Italic',

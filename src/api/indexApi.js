@@ -6,7 +6,8 @@ export const indexApi = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    timeout: 10000,
+    // Увеличиваем таймаут, т.к. запросы к Gemini/новостям могут занимать дольше 10 секунд
+    timeout: 30000,
 });
 
 // Request interceptor - добавляет токен в заголовки

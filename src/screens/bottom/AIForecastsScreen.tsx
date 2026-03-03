@@ -1,11 +1,13 @@
 import React, { useCallback, useState } from "react";
-import { Text, View, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator, Linking } from "react-native";
+import { Text, View, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Linking } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MainStackParamList } from "../../navigation/stackNavigation/MainNavigation";
 import theme from "../../constants/colors";
 import { fontSizes, spacing, sizes } from "../../utils/fontSizes";
 import { getAllNewsApi } from "../../api/newsApi";
+import { getAllForecastsApi } from "../../api/forecastApi";
+import LottieView from "lottie-react-native";
 
 type AIForecastsScreenNavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -13,6 +15,8 @@ const AIForecastsScreen = () => {
     const navigation = useNavigation<AIForecastsScreenNavigationProp>();
     const [portfolioNewsLoading, setPortfolioNewsLoading] = useState(true);
     const [portfolioNews, setPortfolioNews] = useState<any[]>([]);
+    const [personalLoading, setPersonalLoading] = useState(false);
+    const [personalRecommendations, setPersonalRecommendations] = useState<any[]>([]);
 
     const loadPortfolioNews = useCallback(async () => {
         try {
@@ -29,9 +33,24 @@ const AIForecastsScreen = () => {
         }
     }, []);
 
+    const loadPersonalForecasts = useCallback(async () => {
+        try {
+            setPersonalLoading(true);
+            const res = await getAllForecastsApi();
+            const items = Array.isArray(res) ? res : (res?.data || []);
+            setPersonalRecommendations(Array.isArray(items) ? items : []);
+        } catch (error) {
+            console.error('Error loading personal forecasts:', error);
+            setPersonalRecommendations([]);
+        } finally {
+            setPersonalLoading(false);
+        }
+    }, []);
+
     useFocusEffect(
         useCallback(() => {
             loadPortfolioNews();
+            // Личные прогнозы теперь генерируются только по нажатию на кнопку
         }, [loadPortfolioNews])
     );
 
@@ -41,34 +60,6 @@ const AIForecastsScreen = () => {
         const date = new Date(seconds * 1000);
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
-
-    // Mock data - персональные рекомендации на основе портфеля
-    const personalRecommendations = [
-        {
-            id: 1,
-            type: 'buy',
-            stock: { name: "Apple", shortName: "AAPL", img: require('../../assets/img/appleLogo.png') },
-            reason: "Based on your portfolio and recent news about Apple's new product launch, AI recommends increasing your position.",
-            confidence: 85,
-            timeframe: "1-3 months",
-        },
-        {
-            id: 2,
-            type: 'hold',
-            stock: { name: "Tesla", shortName: "TSLA", img: require('../../assets/img/logo.jpg') },
-            reason: "Your Tesla holdings are performing well. AI suggests holding current position as market volatility is expected.",
-            confidence: 72,
-            timeframe: "2-4 weeks",
-        },
-        {
-            id: 3,
-            type: 'sell',
-            stock: { name: "Microsoft", shortName: "MSFT", img: require('../../assets/img/appleLogo.png') },
-            reason: "Recent regulatory concerns may impact short-term performance. Consider taking partial profits.",
-            confidence: 68,
-            timeframe: "1-2 weeks",
-        },
-    ];
 
     // Mock data - общие рекомендации по новостям
     const marketNews = [
@@ -141,44 +132,71 @@ const AIForecastsScreen = () => {
                     AI analysis based on your current portfolio and latest market news
                 </Text>
 
-                {personalRecommendations.map((rec, id) => (
-                    <TouchableOpacity
-                        key={id}
-                        style={styles.recommendationCard}
-                        onPress={() => navigation.navigate('CompanyInfo', {
-                            name: rec.stock.name,
-                            shortName: rec.stock.shortName,
-                            img: rec.stock.img,
-                        })}
-                    >
-                        <View style={styles.recommendationHeader}>
-                            <View style={styles.recommendationLeft}>
-                                {/* <Image source={rec.stock.img} style={styles.stockLogo} resizeMode="contain" /> */}
-                                <View style={styles.stockInfo}>
-                                    <Text style={styles.stockName}>{rec.stock.name}</Text>
-                                    <Text style={styles.stockTicker}>{rec.stock.shortName}</Text>
+                <TouchableOpacity
+                    style={[
+                        styles.generateButton,
+                        personalLoading && styles.generateButtonDisabled,
+                    ]}
+                    activeOpacity={0.85}
+                    onPress={loadPersonalForecasts}
+                    disabled={personalLoading}
+                >
+                    <Text style={styles.generateButtonText}>
+                        {personalLoading ? 'Generating forecasts...' : 'Generate AI forecasts'}
+                    </Text>
+                </TouchableOpacity>
+
+                {personalLoading ? (
+                     <View style={styles.loadingInline}>
+                        <LottieView 
+                        source={require('../../assets/lottie/Ailoading.json')} 
+                        autoPlay 
+                        style={{ width: 200, height: 200}}
+                        loop
+                    />
+                    </View>
+                ) : personalRecommendations.length === 0 ? (
+                    <View style={styles.emptyInline}>
+                        <Text style={styles.emptyInlineText}>No forecasts available</Text>
+                    </View>
+                ) : (
+                    personalRecommendations.map((rec: any, idx: number) => (
+                        <TouchableOpacity
+                            key={rec.id ?? idx}
+                            style={styles.recommendationCard}
+                            onPress={() => navigation.navigate('CompanyInfo', {
+                                name: rec.stock?.name || rec.stock?.shortName || 'Unknown',
+                                shortName: rec.stock?.shortName,
+                            })}
+                        >
+                            <View style={styles.recommendationHeader}>
+                                <View style={styles.recommendationLeft}>
+                                    <View style={styles.stockInfo}>
+                                        <Text style={styles.stockName}>{rec.stock?.name || rec.stock?.shortName}</Text>
+                                        <Text style={styles.stockTicker}>{rec.stock?.shortName}</Text>
+                                    </View>
+                                </View>
+                                <View style={[
+                                    styles.recommendationBadge,
+                                    rec.type === 'buy' ? styles.buyBadge :
+                                    rec.type === 'sell' ? styles.sellBadge : styles.holdBadge
+                                ]}>
+                                    <Text style={styles.recommendationBadgeText}>
+                                        {(rec.type || '').toUpperCase()}
+                                    </Text>
                                 </View>
                             </View>
-                            <View style={[
-                                styles.recommendationBadge,
-                                rec.type === 'buy' ? styles.buyBadge :
-                                rec.type === 'sell' ? styles.sellBadge : styles.holdBadge
-                            ]}>
-                                <Text style={styles.recommendationBadgeText}>
-                                    {rec.type.toUpperCase()}
-                                </Text>
+                            <Text style={styles.recommendationReason}>{rec.reason}</Text>
+                            <View style={styles.recommendationFooter}>
+                                <View style={styles.confidenceContainer}>
+                                    <Text style={styles.confidenceLabel}>Confidence:</Text>
+                                    <Text style={styles.confidenceValue}>{Number(rec.confidence || 0)}%</Text>
+                                </View>
+                                <Text style={styles.timeframe}>Timeframe: {rec.timeframe}</Text>
                             </View>
-                        </View>
-                        <Text style={styles.recommendationReason}>{rec.reason}</Text>
-                        <View style={styles.recommendationFooter}>
-                            <View style={styles.confidenceContainer}>
-                                <Text style={styles.confidenceLabel}>Confidence:</Text>
-                                <Text style={styles.confidenceValue}>{rec.confidence}%</Text>
-                            </View>
-                            <Text style={styles.timeframe}>Timeframe: {rec.timeframe}</Text>
-                        </View>
-                    </TouchableOpacity>
-                ))}
+                        </TouchableOpacity>
+                    ))
+                )}
 
 
                 
@@ -391,6 +409,51 @@ const styles = StyleSheet.create({
         fontSize: fontSizes.caption,
         color: theme.text.muted,
         fontFamily: 'ZalandoSansExpanded-Italic',
+    },
+    generateButton: {
+        marginTop: spacing.md,
+        marginBottom: spacing.lg,
+        alignSelf: 'stretch',
+        backgroundColor: theme.accent.magenta,
+        paddingVertical: spacing.md,
+        borderRadius: sizes.cardBorderRadius,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    generateButtonDisabled: {
+        opacity: 0.7,
+    },
+    generateButtonText: {
+        fontSize: fontSizes.body,
+        fontWeight: 'bold',
+        color: '#ffffff',
+        fontFamily: 'ZalandoSansExpanded-Italic',
+    },
+    generatingCard: {
+        marginTop: spacing.md,
+        marginBottom: spacing.lg,
+        padding: sizes.cardPaddingLarge,
+        borderRadius: sizes.cardBorderRadius,
+        backgroundColor: theme.background.secondary,
+        borderWidth: 1,
+        borderColor: theme.accent.magenta,
+        alignItems: 'center',
+    },
+    generatingTitle: {
+        marginTop: spacing.md,
+        fontSize: fontSizes.body,
+        fontWeight: 'bold',
+        color: theme.text.primary,
+        fontFamily: 'ZalandoSansExpanded-Italic',
+        textAlign: 'center',
+    },
+    generatingSubtitle: {
+        marginTop: spacing.xs,
+        fontSize: fontSizes.bodySmall,
+        color: theme.text.muted,
+        fontFamily: 'ZalandoSansExpanded-Italic',
+        textAlign: 'center',
+        lineHeight: fontSizes.bodySmall * 1.4,
     },
     newsCard: {
         backgroundColor: theme.background.secondary,
