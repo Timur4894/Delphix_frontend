@@ -61,11 +61,6 @@ const AIForecastsScreen = () => {
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
 
-    // Mock data - общие рекомендации по новостям
-    const marketNews = [
-
-    ];
-
     return (
         <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
             {/* Warning Banner */}
@@ -197,9 +192,6 @@ const AIForecastsScreen = () => {
                         </TouchableOpacity>
                     ))
                 )}
-
-
-                
             </View>
         </ScrollView>
     );

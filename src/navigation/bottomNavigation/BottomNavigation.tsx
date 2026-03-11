@@ -8,6 +8,8 @@ import PortfolioSvg from "../../assets/svg/PortfolioSvg";
 import SearchSvg from "../../assets/svg/SearchSvg";
 import AISvg from "../../assets/svg/AISvg";
 import ProfileSvg from "../../assets/svg/ProfileSvg";
+import GoldPredictionScreen from "../../screens/bottom/GoldPredictionScreen";
+import TriangleSvg from "../../assets/svg/TriangleSvg";
 
 const Tab = createBottomTabNavigator();
 
@@ -59,6 +61,15 @@ const BottomNavigation = () => {
                 options={{
                     tabBarIcon: ({ color, size }) => (
                         <AISvg width={size} height={size} color={color} />
+                    ),
+                }}
+            />
+            <Tab.Screen 
+                name="GoldPrediction" 
+                component={GoldPredictionScreen}
+                options={{
+                    tabBarIcon: ({ color, size }) => (
+                        <TriangleSvg width={size} height={size} color={color} />
                     ),
                 }}
             />
